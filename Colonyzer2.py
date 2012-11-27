@@ -25,12 +25,6 @@ def contiguous_regions(condition):
     idx.shape = (-1,2)
     return idx
 
-def autocor(x):
-    s = numpy.fft.fft(x)
-    res=numpy.real(numpy.fft.ifft(s*numpy.conjugate(s)))/numpy.var(x)
-    res=res[0:len(res)/2]
-    return(res)
-
 def getMaxima(intensity):
     '''Numerical method to find local maxima in a 1D list with plateaus'''
     npoints=len(intensity)
@@ -43,143 +37,216 @@ def getMaxima(intensity):
     
     return(maxima)
 
-def plotSpectrum(y,Fs):
-    """
-    Plots a Single-Sided Amplitude Spectrum of y(t)
-    """
-    n = len(y) # length of the signal
-    k = numpy.arange(n)
-    T = n/Fs
-    frq = k/T # two sides frequency range
-    frq = frq[range(n/2)] # one side frequency range
+def optimiseSpot(arr,x,y,rad,RAD):
+    '''Search in a square of width 2*RAD for the centre of a smaller square (of width 2*rad) which maximises the sum of signal inside the small square'''
+    x_grid, y_grid = numpy.meshgrid(numpy.arange(x-(RAD-rad),x+(RAD-rad)),numpy.arange(y-(RAD-rad),y+(RAD-rad)))
+    x_grid=x_grid.flatten()
+    y_grid=y_grid.flatten()
+    signal=numpy.array([numpy.sum(arr[(y_grid[i]-rad):(y_grid[i]+rad),(x_grid[i]-rad):(x_grid[i]+rad)]) for i in xrange(0,len(x_grid))])
+    iopt=numpy.argmax(signal)
+    return(x_grid[iopt],y_grid[iopt])
 
-    Y = scipy.fft(y)/n # fft computing and normalization
-    Y = Y[range(n/2)]
+def autocor(x):
+    s = numpy.fft.fft(x)
+    res=numpy.real(numpy.fft.ifft(s*numpy.conjugate(s)))/numpy.var(x)
+    res=res[0:len(res)/2]
+    return(res)
 
-    plt.plot(frq[1:],abs(Y)[1:]) # plotting the spectrum
-    plt.xlabel('Freq (Hz)')
-    plt.ylabel('|Y(freq)|')
-    plt.show()
+def showIm(arr,returnIm=False):
+    '''Quick 8-bit preview images from float arrays, useful for debugging'''
+    imarr=numpy.array(arr,dtype=numpy.uint8)
+    imnew=Image.fromarray(imarr,"L")
+    if returnIm:
+        return(imnew)
+    else:
+        imnew.show()
 
-def estimateOffsets(arr,diam=20,limFrac=1.075,showPlt=True,pdfPlt=False):
-    '''Sum intensities along edge of array and search for the first maximum which is greater than limFrac*smoothed sum as offset estimate'''
-    sumx=numpy.array([numpy.mean(arr[0:arr.shape[0],numpy.max([0,dx-diam/4]):numpy.min([arr.shape[1],dx+diam/4])]) for dx in xrange(0,arr.shape[1])],dtype=numpy.int)
-    sumy=numpy.array([numpy.mean(arr[numpy.max([0,dy-diam/4]):numpy.min([arr.shape[0],dy+diam/4]),0:arr.shape[1]]) for dy in xrange(0,arr.shape[0])],dtype=numpy.int)
-    smoothedx=signal.medfilt(sumx,2*diam+1)
-    smoothedy=signal.medfilt(sumy,2*diam+1)
-    limx,limy=limFrac*smoothedx,limFrac*smoothedy
-    maxx,maxy=getMaxima(sumx),getMaxima(sumy)
-##    candx=maxx[sumx[maxx]>limx[maxx]]
-##    candy=maxy[sumy[maxy]>limy[maxy]]
-    candx,candy=maxx,maxy
-    candx=signal.find_peaks_cwt(sumx,numpy.arange(0,arr.shape[1]/24))
-    candy=signal.find_peaks_cwt(sumy,numpy.arange(0,arr.shape[1]/16))
+def estimateLocations(arr,diam=20,showPlt=True,pdfPlt=False):
+    '''Automatically search for best estimate for location of culture array'''
+    # Generate windowed mean intensities, scanning along x and y axes
+    sumx=numpy.array([numpy.mean(arr[0:arr.shape[0],numpy.max([0,dx-diam/4]):numpy.min([arr.shape[1],dx+diam/4])]) for dx in xrange(0,arr.shape[1])],dtype=numpy.float)
+    sumy=numpy.array([numpy.mean(arr[numpy.max([0,dy-diam/4]):numpy.min([arr.shape[0],dy+diam/4]),0:arr.shape[1]]) for dy in xrange(0,arr.shape[0])],dtype=numpy.float)
+    # First peak in autocorrelation function is best estimate of distance between spots
+    dx=1+numpy.where(numpy.diff(numpy.sign(numpy.diff(autocor(sumx))))==-2)[0][0]
+    dy=1+numpy.where(numpy.diff(numpy.sign(numpy.diff(autocor(sumx))))==-2)[0][0]
+    # Find all maxima
+    maxx=1+numpy.where(numpy.diff(numpy.sign(numpy.diff(sumx)))==-2)[0]
+    maxy=1+numpy.where(numpy.diff(numpy.sign(numpy.diff(sumy)))==-2)[0]
+    # Find the nspots maxima whose mean intermaximum distance is most internally consistent
+    varx,vary=[],[]
+    for i in xrange(0,len(maxx)-nx-1):
+        varx.append(numpy.var(numpy.diff(maxx[i:(i+nx)])))
+    for i in xrange(0,len(maxy)-ny-1):
+        vary.append(numpy.var(numpy.diff(maxy[i:(i+ny)])))
+    candx=maxx[numpy.argmin(varx):(numpy.argmin(varx)+nx)]
+    candy=maxy[numpy.argmin(vary):(numpy.argmin(vary)+ny)]
+    # Output some plots
     if showPlt:
         plt.plot(sumx)
-        plt.plot(smoothedx)
-        plt.plot(limx)
         for cand in candx:
             plt.axvline(x=cand,linestyle='--',linewidth=0.5,color="black")
-        plt.xlabel('x coordinate')
+        plt.xlabel('x coordinate (px)')
         plt.ylabel('Mean Intensity')
         if pdfPlt:
             pdf.savefig()
             plt.close()
         else:
             plt.show()
+        
+        plt.plot(autocor(sumx))
+        maxima=numpy.where(numpy.diff(numpy.sign(numpy.diff(autocor(sumx))))==-2)[0]
+        for cand in maxima:
+            plt.axvline(x=cand,linestyle='--',linewidth=0.5,color="black")
+        plt.xlabel('Offset dx (px)')
+        plt.ylabel('Autocorrelation')
+        if pdfPlt:
+            pdf.savefig()
+            plt.close()
+        else:
+            plt.show()
+            
         plt.plot(sumy)
-        plt.plot(smoothedy)
-        plt.plot(limy)
         for cand in candy:
             plt.axvline(x=cand,linestyle='--',linewidth=0.5,color="black")
-        plt.xlabel('y coordinate')
+        plt.xlabel('y coordinate (px)')
         plt.ylabel('Mean Intensity')
         if pdfPlt:
             pdf.savefig()
             plt.close()
         else:
             plt.show()
-    resx,resy=0,0
-    if len(candx)==0:
-        resx=-1
+        plt.plot(autocor(sumy))
+        maxima=numpy.where(numpy.diff(numpy.sign(numpy.diff(autocor(sumy))))==-2)[0]
+        for cand in maxima:
+            plt.axvline(x=cand,linestyle='--',linewidth=0.5,color="black")
+        plt.xlabel('Offset dy (px)')
+        plt.ylabel('Autocorrelation')
+        if pdfPlt:
+            pdf.savefig()
+            plt.close()
+        else:
+            plt.show()
+    return((candx,candy,dx,dy))
+
+def initialGuess(intensities,counts):
+    '''Construct non-parametric guesses for distributions of two components and use these to estimate Gaussian parameters'''
+    # Get all maxima
+    maxima=1+numpy.where(numpy.diff(numpy.sign(numpy.diff(counts)))==-2)[0]
+    maxima=maxima[counts[maxima]>0.01*numpy.sum(counts)]
+    # Use first maximum of distribution as estimate of mean of first component
+    mu1=intensities[maxima[0]]
+    # Mirror curve from 0...mu1 to estimate distribution of first component
+    P1=numpy.concatenate((counts[0:mu1+1],counts[mu1-1::-1],numpy.zeros(len(counts)-2*mu1-1,dtype=numpy.int)))
+    # Use last maximum of distribution as estimate of mean of second component
+    mu2=intensities[maxima[-1]]
+    # Mirror curve for second peak also
+    halfpeak=counts[mu2:]
+    peak=numpy.concatenate((halfpeak[-1::-1],halfpeak[1:]))
+    P2=numpy.concatenate((numpy.zeros(len(counts)-len(peak),dtype=numpy.int),peak))
+    bindat=pandas.DataFrame(intensities,columns=["intensities"])
+    bindat["counts"]=counts
+    bindat["P1"]=P1
+    bindat["P2"]=P2
+    # Calculate standard deviation of (binned) observations from first and second components
+    sigma1=numpy.sqrt(numpy.sum(P1*(numpy.array(intensities-mu1,dtype=numpy.float)**2)/numpy.sum(P1)))/2
+    sigma2=numpy.sqrt(numpy.sum(P2*(numpy.array(intensities-mu2,dtype=numpy.float)**2)/numpy.sum(P2)))/2
+    # Estimate component weighting
+    theta=float(numpy.sum(P1))/float(numpy.sum(P1)+numpy.sum(P2))
+    # Discard empty bins
+    bindat=bindat[bindat.counts>0]
+    bindat["frac"]=numpy.array(numpy.cumsum(bindat.counts),dtype=numpy.float)/numpy.sum(bindat.counts)
+    bindat["freq"]=numpy.array(bindat.counts,dtype=numpy.float)/numpy.sum(bindat.counts)
+    return((bindat,[theta,mu1,mu2,sigma1,sigma2]))
+
+def totFunc(x,p):
+    '''Probability density function for a 2-component mixed Gaussian model'''
+    [theta,mu1,mu2,sigma1,sigma2]=p
+    if mu2-mu1<2:
+        candidate=1e-100
     else:
-        resx=candx[0]
-    if len(candy)==0:
-        resy=-1
+        candidate=theta*stats.norm.pdf(x,mu1,sigma1)+(1.0-theta)*stats.norm.pdf(x,mu2,sigma2)
+##    if candidate<1e-100:
+##        candidate=1e-100
+    return(candidate)
+
+def makeObjective(ints,cnts,PDF):
+    '''Returns a function for (log likelihood)*-1 (suitable for minimisation), given a set of binned observations and a PDF'''
+    ints=numpy.array(ints,dtype=numpy.int)
+    cnts=numpy.array(cnts,dtype=numpy.int)
+    def logL(p):
+        modeldens=numpy.array([PDF(x,p) for x in ints],dtype=numpy.float)
+        lik=numpy.sum(cnts*numpy.log(modeldens))
+        return(-1*lik)
+    return(logL)
+
+def getRoot(p,ints):
+    '''Get the point at which two component Gaussians intersect.  Specifically looking for root with highest probability.'''
+    [theta,mu1,mu2,sigma1,sigma2]=p
+    ints=numpy.array(ints,dtype=numpy.int)
+    def diffFunc(x):
+        return(theta*stats.norm.pdf(x,mu1,sigma1)-(1.0-theta)*stats.norm.pdf(x,mu2,sigma2))
+    # Find pairs of points in truncated, filtered intensity list which bracket any roots
+    diffs=[numpy.sign(diffFunc(x)) for x in ints]
+    switches=[]
+    for i in xrange(1,len(diffs)):
+        if abs((diffs[i]-diffs[i-1]))==2:
+            switches.append((i,i-1))
+    # Fine-tune root locations
+    threshlist=[]
+    for switch in switches:
+        thresh=optimize.brentq(diffFunc,ints[switch[0]],ints[switch[1]])
+        threshlist.append(thresh)
+    # Get root which gives the highest probability for peak 1 (or peak 2, either is fine)
+    p1=[stats.norm.pdf(thresh,mu1,sigma1) for thresh in threshlist]
+    thresh=threshlist[numpy.argmax(p1)]
+    return(thresh)
+
+def thresholdImage(arr,thresh,saveim=True):
+    '''Thresholding array representation of an image'''
+    arr[arr<thresh]=0
+    arr[arr>=thresh]=255
+    arr=numpy.array(arr,dtype=numpy.uint8)
+    arr=arr.reshape(im.size[::-1])
+    imnew=Image.fromarray(arr, "L")
+    if saveim:
+        imnew.save(os.path.join(fullpath,fname+".png"))
+    return(imnew)
+
+def plotGuess(bindat,label="",pdf=None):
+    '''Plot intensity frequency histogram and non-parametric estimates of component distributions'''
+    plt.figure()
+    plt.plot(bindat.intensities,bindat.counts,color="black")
+    plt.plot(bindat.intensities,bindat.P1,color="red")
+    plt.plot(bindat.intensities,bindat.P2,color="blue")
+    plt.xlabel('Intensity')
+    plt.ylabel('Frequency')
+    plt.suptitle(label)
+    if pdf==None:
+        plt.show()
     else:
-        resy=candy[0]
-    return((resx,resy))
+        pdf.savefig()
+        plt.close()
 
-def is_number(s):
-    try:
-        int(s)
-        return True
-    except ValueError:
-        return False
-
-def SetUp(instructarr):
-    '''Set up plate description (i.e. 1536 or 384 format, top-left and bottom-right coordinates etc.)'''
-    # Check if the first element is an integer:
-    if is_number(instructarr[0]):
-        NoSpots=int(instructarr[0])
+def plotModel(bindat,label="",pdf=None):
+    '''Plot intensity density histogram, modelled distribution, component distributions and threshold estimate.'''
+    plt.figure()
+    plt.plot(bindat.intensities,bindat.freq,color="black")
+    plt.plot(bindat.intensities,bindat.gauss1,color="red")
+    plt.plot(bindat.intensities,bindat.gauss2,color="blue")
+    plt.plot(bindat.intensities,bindat.mixed,color="green")
+    plt.xlabel('Intensity')
+    plt.ylabel('Density')
+    plt.suptitle(label)
+    plt.axvline(x=thresh,linestyle='--',linewidth=0.5,color="darkorchid")
+    if pdf==None:
+        plt.show()
     else:
-        NoSpots=instructarr[0]
-    TLX,TLY,BRX,BRY=instructarr[1],instructarr[2],instructarr[3],instructarr[4]
-    if NoSpots==384:
-        nocols,norows = 24,16
-    elif NoSpots==1536:
-        nocols,norows = 48,32
-    elif NoSpots==768:
-        nocols,norows = 48,32
-    elif NoSpots==96:
-        nocols,norows = 12,8
-    elif NoSpots==48:
-        nocols,norows = 6,8
-    elif not is_number(NoSpots) and 'x' in NoSpots and len(NoSpots.split("x"))==2:
-        tmp=NoSpots.split("x")
-        nocols,norows = int(tmp[0]),int(tmp[1])
-    else:
-        nocols,norows=0,0
-        print "WARNING: Incorrect spot number specified!"
-    tlx,tly=TLX,TLY
-    brx,bry=BRX,BRY
-
-    # Best estimates for tile dimensions
-    xdimf=float(abs(brx-tlx))/float(nocols-1)
-    ydimf=float(abs(bry-tly))/float(norows-1)
-    xdim=int(round(xdimf))
-    ydim=int(round(ydimf))
-
-    # Parameter for specifying the search area (area is (NSearch*2+1)^2)
-    NSearch = int(round(float(min(xdim,ydim))/2.0))
-
-    # Best estimates for the starting coordinates
-    xstart=max(0,int(round(float(tlx)-0.5*xdimf)))
-    ystart=max(0,int(round(float(tly)-0.5*ydimf)))
-
-    print "Instructions: ",xstart,ystart,xdim,ydim,NSearch
-    return((nocols,norows, tlx,tly,brx,bry,xdim,ydim,xdimf,ydimf,xstart,ystart,NSearch))
+        pdf.savefig()
+        plt.close()
 
 # Current directory
 syspath = os.path.dirname(sys.argv[0])
 fullpath = os.path.abspath(syspath)
-
-# Read in the Colonyzer input file
-Instructions=open(os.path.join(fullpath,'Colonyzer.txt'),'r')
-InsData={}
-InsTemp=Instructions.readlines()
-
-for x in xrange(0,len(InsTemp)):
-    if InsTemp[x][0]!="#" and InsTemp[x][0]!="\n":
-        tlist=InsTemp[x].split(',')
-        if len(tlist)>1:
-            InsData[tlist[0]]=[tlist[1],int(tlist[2]),int(tlist[3]),int(tlist[4]),int(tlist[5])]
-
-if 'default' in InsData:
-    (nocols,norows, tlx,tly,brx,bry,xdim,ydim,xdimf,ydimf,xstart,ystart,NSearch)=SetUp(InsData['default'])
-else:
-    print "ERROR: No default instructions"
-    sys.exit()
 
 # Create directories for storing output data and preview images
 try:
@@ -208,69 +275,67 @@ for b in barcdict:
 
 BARCODE=barcdict.keys()[0]
 LATESTIMAGE=barcdict[BARCODE][0]
+EARLIESTIMAGE=barcdict[BARCODE][-1]
 im=Image.open(LATESTIMAGE)
 img=im.convert("F")
 arr=numpy.array(img,dtype=numpy.float)
-#(dx,dy)=estimateOffsets(arr,2*NSearch,showPlt=True)
+    
+nx,ny=24,16
+diam=int(round(min(float(arr.shape[0])/ny,float(arr.shape[1])/nx)))
+(candx,candy,dx,dy)=estimateLocations(arr,diam,showPlt=False)
+xloc,yloc=numpy.meshgrid(candx,candy)
+cols,rows=numpy.meshgrid(numpy.arange(1,nx+1),numpy.arange(1,ny+1))
+d={"Row":rows.flatten(),"Column":cols.flatten(),"y":yloc.flatten(),"x":xloc.flatten()}
+locations=pandas.DataFrame(d)
+rad=int(round(float(min(dx,dy))/2.0))
+RAD=1.2*rad
+for i in xrange(0,len(locations.x)):
+    (dx,dy)=optimiseSpot(arr,locations.x[i],locations.y[i],rad,RAD)
+    locations.x[i]=dx
+    locations.y[i]=dy
+
+# Analyse first image to allow lighting correction
+im0=Image.open(EARLIESTIMAGE)
+img=im0.convert("F")
+arr0=numpy.array(img,dtype=numpy.float)
+smoothed_arr=ndimage.gaussian_filter(arr0,arr.shape[1]/500)
+average_back=numpy.mean(smoothed_arr)
+
+# Apply lighting correction to last image
+corrected_arr=arr*average_back/smoothed_arr
+
+# Threshold corrected image
+# Initial guess for mixed model parameters for thresholding lighting corrected image
+# Trim outer part of image to remove plate walls
+trimmed_arr=corrected_arr[(min(locations.y)-dy):(max(locations.y)+dy),(min(locations.x)-dx):(max(locations.x)+dx)]
+(counts,intensities)=numpy.histogram(trimmed_arr,bins=2**8,range=(0,2**8))
+intensities=numpy.array(intensities[0:-1],dtype=numpy.int)
+(bindat,[theta,mu1,mu2,sigma1,sigma2])=initialGuess(intensities,counts)
+
+# Maximise likelihood of 2-component mixed Gaussian model parameters given binned observations by constrained optimisation
+logL=makeObjective(bindat.intensities,bindat.counts,totFunc)
+b=[(0.5,1.0),(float(mu1)/5.0,5*float(mu1)),(float(mu2)/5.0,5.0*float(mu2)),(float(sigma1)/5.0,5.0*float(sigma1)),(float(sigma2)/5.0,5.0*float(sigma2))]
+opt=optimize.fmin_l_bfgs_b(logL,[theta,mu1,mu2,sigma1,sigma2],bounds=b,approx_grad=True)
+[theta_opt,mu1_opt,mu2_opt,sigma1_opt,sigma2_opt]=opt[0]
+
+# Best estimate for threshold is point of intersection of two fitted component Gaussians
+thresh=getRoot(opt[0],intensities)
+
+# Modelled densities
+bindat["mixed"]=numpy.array([totFunc(x,opt[0]) for x in bindat.intensities],dtype=numpy.float)
+bindat["gauss1"]=numpy.array([theta_opt*stats.norm.pdf(x,mu1_opt,sigma1_opt) for x in bindat.intensities],dtype=numpy.float)
+bindat["gauss2"]=numpy.array([(1.0-theta_opt)*stats.norm.pdf(x,mu2_opt,sigma2_opt) for x in bindat.intensities],dtype=numpy.float)
+
+# Threshold image and clean up noise
+imthresh=thresholdImage(numpy.copy(corrected_arr),thresh,saveim=False)
+    
+imthresh.show()
+plotGuess(bindat)
+plotModel(bindat)
+
 for FILENAME in barcdict[BARCODE]:
     print FILENAME
-    
 
-diam=2*NSearch
-limFrac=1.075
-showPlt=True
-pdfPlt=False
-sumx=numpy.array([numpy.mean(arr[0:arr.shape[0],numpy.max([0,dx-diam/4]):numpy.min([arr.shape[1],dx+diam/4])]) for dx in xrange(0,arr.shape[1])],dtype=numpy.int)
-sumy=numpy.array([numpy.mean(arr[numpy.max([0,dy-diam/4]):numpy.min([arr.shape[0],dy+diam/4]),0:arr.shape[1]]) for dy in xrange(0,arr.shape[0])],dtype=numpy.int)
-# First peak in autocorrelation function is best estimate of distance between spots
-dx=numpy.where(numpy.diff(numpy.sign(numpy.diff(autocor(sumx))))==-2)[0][0]
-dy=numpy.where(numpy.diff(numpy.sign(numpy.diff(autocor(sumx))))==-2)[0][0]
-# Minimum filter to find best estimate of background
-smoothedx=ndimage.filters.minimum_filter(sumx,2*dx+1)
-smoothedy=ndimage.filters.minimum_filter(sumy,2*dy+1)
-background=numpy.median(numpy.append(smoothedx,smoothedy))
 
-limx,limy=limFrac*smoothedx,limFrac*smoothedy
-maxx,maxy=getMaxima(sumx),getMaxima(sumy)
-candx,candy=maxx,maxy
-if showPlt:
-    plt.plot(sumx)
-    plt.plot(smoothedx)
-    plt.plot(limx)
-    for cand in candx:
-        plt.axvline(x=cand,linestyle='--',linewidth=0.5,color="black")
-    plt.xlabel('x coordinate')
-    plt.ylabel('Mean Intensity')
-    if pdfPlt:
-        pdf.savefig()
-        plt.close()
-    else:
-        plt.show()
-    plt.plot(autocor(sumx))
-    maxima=numpy.where(numpy.diff(numpy.sign(numpy.diff(autocor(sumx))))==-2)[0]
-    for cand in maxima:
-        plt.axvline(x=cand,linestyle='--',linewidth=0.5,color="black")
-    plt.show()
-    plt.plot(sumy)
-    plt.plot(smoothedy)
-    plt.plot(limy)
-    for cand in candy:
-        plt.axvline(x=cand,linestyle='--',linewidth=0.5,color="black")
-    plt.xlabel('y coordinate')
-    plt.ylabel('Mean Intensity')
-    if pdfPlt:
-        pdf.savefig()
-        plt.close()
-    else:
-        plt.show()
-resx,resy=0,0
-if len(candx)==0:
-    resx=-1
-else:
-    resx=candx[0]
-if len(candy)==0:
-    resy=-1
-else:
-    resy=candy[0]
 
 		
