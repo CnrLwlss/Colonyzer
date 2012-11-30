@@ -47,7 +47,7 @@ plot(col1$TRIMMED,col2$TRIMMED,xlab="Colonyzer Trimmed Intensity (AU)",ylab="Col
 plot(col1$WHITEAREA,col2$WHITEAREA,xlab="Colonyzer Area (px)",ylab="Colonyzer2 Fractional Area",cex.lab=1.45,pch=16,cex=0.1)
 
 col=10
-row=10
+row=11
 
 dat1=col1[(col1$ROW==row)&(col1$COLUMN==col),]
 dat2=col2[(col2$ROW==row)&(col2$COLUMN==col),]
@@ -55,10 +55,46 @@ dat2=col2[(col2$ROW==row)&(col2$COLUMN==col),]
 op<-par(mfrow=c(2,3),oma=c(0,2,0,2))
 clab=1.5
 plot(dat1$TIME,dat1$INTENSITY,type="b",xlab="Time (d)",ylab="Intensity (AU)",cex.lab=clab)
-plot(dat1$TIME,dat1$TRIMMED,type="b",xlab="Time (d)",ylab="Trimmed Intensity (AU)",main="Colonyzer",cex.lab=clab)
+plot(dat1$TIME,dat1$TRIMMED,type="b",xlab="Time (d)",ylab="Trimmed Intensity (AU)",main="Colonyzer",cex.lab=clab,cex.main=2)
 plot(dat1$TIME,dat1$WHITEAREA,type="b",xlab="Time (d)",ylab="Area (px)",cex.lab=clab)
 
 plot(dat2$TIME,dat2$INTENSITY,type="b",xlab="Time (d)",ylab="Fractional Intensity",cex.lab=clab)
-plot(dat2$TIME,dat2$TRIMMED,type="b",xlab="Time (d)",ylab="Fractional Trimmed Intensity",main="Colonyzer2",cex.lab=clab)
+plot(dat2$TIME,dat2$TRIMMED,type="b",xlab="Time (d)",ylab="Fractional Trimmed Intensity",main="Colonyzer2",cex.lab=clab,cex.main=2)
 plot(dat2$TIME,dat2$WHITEAREA,type="b",xlab="Time (d)",ylab="Fractional Area",cex.lab=clab)
+par(op)
+
+op<-par(mfrow=c(2,3),oma=c(0,2,0,2))
+clab=1.5
+plot(dat1$TIME,dat1$INTENSITY,type="b",xlab="Time (d)",ylab="Intensity (AU)",cex.lab=clab,log="y")
+plot(dat1$TIME,dat1$TRIMMED,type="b",xlab="Time (d)",ylab="Trimmed Intensity (AU)",main="Colonyzer",cex.lab=clab,cex.main=2,log="y")
+plot(dat1$TIME,dat1$WHITEAREA,type="b",xlab="Time (d)",ylab="Area (px)",cex.lab=clab,log="y")
+
+plot(dat2$TIME,dat2$INTENSITY,type="b",xlab="Time (d)",ylab="Fractional Intensity",cex.lab=clab,log="y")
+plot(dat2$TIME,dat2$TRIMMED,type="b",xlab="Time (d)",ylab="Fractional Trimmed Intensity",main="Colonyzer2",cex.lab=clab,cex.main=2,log="y")
+plot(dat2$TIME,dat2$WHITEAREA,type="b",xlab="Time (d)",ylab="Fractional Area",cex.lab=clab,log="y")
+par(op)
+
+dat1=dat1[dat1$TIME<1.5,]
+dat2=dat2[dat2$TIME<1.5,]
+
+op<-par(mfrow=c(2,3),oma=c(0,2,0,2))
+clab=1.5
+plot(dat1$TIME,dat1$INTENSITY,type="b",xlab="Time (d)",ylab="Intensity (AU)",cex.lab=clab)
+plot(dat1$TIME,dat1$TRIMMED,type="b",xlab="Time (d)",ylab="Trimmed Intensity (AU)",main="Colonyzer",cex.lab=clab,cex.main=2)
+plot(dat1$TIME,dat1$WHITEAREA,type="b",xlab="Time (d)",ylab="Area (px)",cex.lab=clab)
+
+plot(dat2$TIME,dat2$INTENSITY,type="b",xlab="Time (d)",ylab="Fractional Intensity",cex.lab=clab)
+plot(dat2$TIME,dat2$TRIMMED,type="b",xlab="Time (d)",ylab="Fractional Trimmed Intensity",main="Colonyzer2",cex.lab=clab,cex.main=2)
+plot(dat2$TIME,dat2$WHITEAREA,type="b",xlab="Time (d)",ylab="Fractional Area",cex.lab=clab)
+par(op)
+
+op<-par(mfrow=c(2,3),oma=c(0,2,0,2))
+clab=1.5
+plot(dat1$TIME,dat1$INTENSITY,type="b",xlab="Time (d)",ylab="Intensity (AU)",cex.lab=clab,log="y")
+plot(dat1$TIME,dat1$TRIMMED,type="b",xlab="Time (d)",ylab="Trimmed Intensity (AU)",main="Colonyzer (log)",cex.lab=clab,cex.main=2,log="y")
+plot(dat1$TIME,dat1$WHITEAREA,type="b",xlab="Time (d)",ylab="Area (px)",cex.lab=clab,log="y")
+
+plot(dat2$TIME,dat2$INTENSITY,type="b",xlab="Time (d)",ylab="Fractional Intensity",cex.lab=clab,log="y")
+plot(dat2$TIME,dat2$TRIMMED,type="b",xlab="Time (d)",ylab="Fractional Trimmed Intensity",main="Colonyzer2 (log)",cex.lab=clab,cex.main=2,log="y")
+plot(dat2$TIME,dat2$WHITEAREA,type="b",xlab="Time (d)",ylab="Fractional Area",cex.lab=clab,log="y")
 par(op)
