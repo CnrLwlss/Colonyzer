@@ -424,7 +424,6 @@ for BARCODE in barcdict.keys():
         locations.x[i]=x
         locations.y[i]=y
     locations["Diameter"]=min(dx,dy)
-
     print("Cultures located")
 
     # Analyse first image to allow lighting correction
@@ -472,14 +471,15 @@ for BARCODE in barcdict.keys():
     bindat["mixed"]=numpy.array([totFunc(x,opt[0]) for x in bindat.intensities],dtype=numpy.float)
     bindat["gauss1"]=numpy.array([theta_opt*stats.norm.pdf(x,mu1_opt,sigma1_opt) for x in bindat.intensities],dtype=numpy.float)
     bindat["gauss2"]=numpy.array([(1.0-theta_opt)*stats.norm.pdf(x,mu2_opt,sigma2_opt) for x in bindat.intensities],dtype=numpy.float)
-    plotGuess(bindat)
+
+    #plotGuess(bindat)
     #plotModel(bindat,(thresh0,thresh1))
 
     # Find culture area as a function of threshold value
     #cellarea=[arr[arr>i].size for i in xrange(0,256)]
 
     # Free up some memory
-    del arr0,arrN
+    del arr0,arrN, smoothed_arr
 
     print("Threshold located")
     barcdict[BARCODE].sort()
@@ -503,16 +503,13 @@ for BARCODE in barcdict.keys():
         locations=getColours(im,locations,mask)
         locations["Barcode"]=BARCODE
         locations["Filename"]=FILENAME[0:-4]
-        locations.to_csv(FILENAME[0:-4]+".out","\t",index=False)
-        dataf=saveColonyzer(FILENAME[0:-4]+".dat",locations,thresh1,dx,dy)
+        locations.to_csv(os.path.join(outputdata,FILENAME[0:-4]+".out"),"\t",index=False)
+        dataf=saveColonyzer(os.path.join(outputdata,FILENAME[0:-4]+".dat"),locations,thresh1,dx,dy)
         draw=ImageDraw.Draw(im)
         for i in xrange(0,len(locations.x)):
             x,y,r=int(round(locations.x[i])),int(round(locations.y[i])),int(round(float(locations.Diameter[i])/2.0))
             draw.rectangle((x-r,y-r,x+r,y+r),outline=(255,255,0))
-        im.save(FILENAME[0:-4]+".png")
-        #im.show()
-        #imthresh.show()
-
+        im.save(os.path.join(outputimages,FILENAME[0:-4]+".png"))
     print("Finished: "+str(time.time()-start)+" s")
 
 		
