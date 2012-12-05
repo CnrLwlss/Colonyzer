@@ -67,6 +67,7 @@ def optimiseSpot(arr,x,y,rad,RAD):
     return(bestx,besty)
 
 def autocor(x):
+    '''R-like autocorrelation function'''
     s = numpy.fft.fft(x)
     res=numpy.real(numpy.fft.ifft(s*numpy.conjugate(s)))/numpy.var(x)
     res=res[0:len(res)/2]
@@ -112,7 +113,6 @@ def estimateLocations(arr,diam=20,showPlt=True,pdfPlt=False):
             plt.close()
         else:
             plt.show()
-        
         plt.plot(autocor(sumx))
         maxima=numpy.where(numpy.diff(numpy.sign(numpy.diff(autocor(sumx))))==-2)[0]
         for cand in maxima:
@@ -163,13 +163,11 @@ def initialGuess(intensities,counts):
     # Mirror curve for second peak also
     P2=numpy.zeros(len(intensities),dtype=numpy.int)
     halfpeak=counts[mu2:]
-    for i in xrange(-1,max(mu2,mu2-(len(intensities)-mu2)),-1):
-        P2[mu2+i]=P2[mu2-i]
-    #P2[mu2:]=halfpeak
-    #P2[(mu2-1):max(0,(mu2-1-len(halfpeak))):-1]=halfpeak[1:(mu2+1)]
+    for i in xrange(0,mu2):
+        P2[i]=halfpeak[min(len(halfpeak)-1,mu2-i)]
+    for i in xrange(mu2,len(intensities)):
+        P2[i]=halfpeak[i-mu2]
     
-    peak=numpy.concatenate((halfpeak[-1:(len(intensities)-mu2):-1],halfpeak[1:]))
-    P2=numpy.concatenate((numpy.zeros(len(counts)-len(peak),dtype=numpy.int),peak))
     bindat=pandas.DataFrame(intensities,columns=["intensities"])
     bindat["counts"]=counts
     bindat["P1"]=P1
@@ -192,8 +190,6 @@ def totFunc(x,p):
         candidate=1e-100
     else:
         candidate=theta*stats.norm.pdf(x,mu1,sigma1)+(1.0-theta)*stats.norm.pdf(x,mu2,sigma2)
-##    if candidate<1e-100:
-##        candidate=1e-100
     return(candidate)
 
 def makeObjective(ints,cnts,PDF):
@@ -415,7 +411,7 @@ for BARCODE in barcdict.keys():
         
     nx,ny=24,16
     diam=int(round(min(float(arrN.shape[0])/ny,float(arrN.shape[1])/nx)))
-    (candx,candy,dx,dy)=estimateLocations(arrN,diam,showPlt=True)
+    (candx,candy,dx,dy)=estimateLocations(arrN,diam,showPlt=False)
     xloc,yloc=numpy.meshgrid(candx,candy)
     cols,rows=numpy.meshgrid(numpy.arange(1,nx+1),numpy.arange(1,ny+1))
     d={"Row":rows.flatten(),"Column":cols.flatten(),"y":yloc.flatten(),"x":xloc.flatten()}
