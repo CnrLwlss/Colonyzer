@@ -367,7 +367,7 @@ def saveColonyzer(filename,locs,thresh,dx,dy):
     df["YDIM"]=dy
     colorder=("FILENAME","ROW","COLUMN","TOPLEFTX","TOPLEFTY","WHITEAREA","TRIMMED","THRESHOLD","INTENSITY","EDGEPIXELS","COLR","COLG","COLB","BKR","BKG","BKB","EDGELEN","XDIM","YDIM")
     dataf=pandas.DataFrame(df)
-    dataf.to_csv(filename,"\t",index=False,header=False)
+    dataf.to_csv(filename,"\t",index=False,header=False,cols=colorder)
     return(dataf)
 
 start=time.time()
@@ -505,11 +505,13 @@ for BARCODE in barcdict.keys():
         locations["Filename"]=FILENAME[0:-4]
         locations.to_csv(os.path.join(outputdata,FILENAME[0:-4]+".out"),"\t",index=False)
         dataf=saveColonyzer(os.path.join(outputdata,FILENAME[0:-4]+".dat"),locations,thresh1,dx,dy)
-        draw=ImageDraw.Draw(im)
+        imthresh=imthresh.convert("RGB")
+        draw=ImageDraw.Draw(imthresh)
+        colours=((255,0,0),(0,255,0),(0,0,255),(255,255,0),(0,255,255),(255,0,255))
         for i in xrange(0,len(locations.x)):
             x,y,r=int(round(locations.x[i])),int(round(locations.y[i])),int(round(float(locations.Diameter[i])/2.0))
-            draw.rectangle((x-r,y-r,x+r,y+r),outline=(255,255,0))
-        im.save(os.path.join(outputimages,FILENAME[0:-4]+".png"))
+            draw.rectangle((x-r,y-r,x+r,y+r),outline=colours[i%5])
+        imthresh.save(os.path.join(outputimages,FILENAME[0:-4]+".png"))
     print("Finished: "+str(time.time()-start)+" s")
 
 		
