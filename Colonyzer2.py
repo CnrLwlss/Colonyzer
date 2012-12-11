@@ -4,6 +4,59 @@ from PIL import Image, ImageDraw, ImageFont
 from scipy import stats, optimize, ndimage, signal
 import scipy
 
+def is_number(s):
+    try:
+        int(s)
+        return True
+    except ValueError:
+        return False
+
+def SetUp(instructarr):
+    # Check if the first element is an integer:
+    if is_number(instructarr[0]):
+        NoSpots=int(instructarr[0])
+    else:
+        NoSpots=instructarr[0]
+    TLX,TLY,BRX,BRY=instructarr[1],instructarr[2],instructarr[3],instructarr[4]
+    if NoSpots==384:
+        nocols,norows = 24,16
+    elif NoSpots==1536:
+        nocols,norows = 48,32
+    elif NoSpots==768:
+        nocols,norows = 48,32
+    elif NoSpots==96:
+        nocols,norows = 12,8
+    elif NoSpots==48:
+        nocols,norows = 6,8
+    elif not is_number(NoSpots) and 'x' in NoSpots and len(NoSpots.split("x"))==2:
+        tmp=NoSpots.split("x")
+        nocols,norows = int(tmp[0]),int(tmp[1])
+    else:
+        nocols,norows=0,0
+        print "WARNING: Incorrect spot number specified!"
+    tlx,tly=TLX,TLY
+    brx,bry=BRX,BRY
+
+    # Best estimates for tile dimensions
+    xdimf=float(abs(brx-tlx))/float(nocols-1)
+    ydimf=float(abs(bry-tly))/float(norows-1)
+    xdim=int(round(xdimf))
+    ydim=int(round(ydimf))
+
+    # Best estimates for the starting coordinates
+    xstart=max(0,int(round(float(tlx)-0.5*xdimf)))
+    ystart=max(0,int(round(float(tly)-0.5*ydimf)))
+
+    # Parameter for specifying the search area (area is (NSearch*2+1)^2)
+    NSearch = int(round(3.0*float(min(xdim,ydim))/8.0))
+    print "Instructions: ",xstart,ystart,xdim,ydim,NSearch
+    candx,candy=[],[]
+    for ROW in xrange(norows):
+        candy.append(int(round(ystart+ydimf/2.0+float(ROW)*ydimf)))
+    for COL in xrange(nocols):
+        candx.append(int(round(xstart+xdimf/2.0+float(COL)*xdimf)))
+    return((candx,candy,xdim,ydim))
+
 def contiguous_regions(condition):
     '''Finds contiguous True regions of the boolean array "condition". Returns
     a 2D array where the first column is the start index of the region and the
@@ -89,16 +142,22 @@ def estimateLocations(arr,diam=20,showPlt=True,pdfPlt=False):
     sumy=numpy.array([numpy.mean(arr[numpy.max([0,dy-diam/4]):numpy.min([arr.shape[0],dy+diam/4]),0:arr.shape[1]]) for dy in xrange(0,arr.shape[0])],dtype=numpy.float)
     # First peak in autocorrelation function is best estimate of distance between spots
     dx=1+numpy.where(numpy.diff(numpy.sign(numpy.diff(autocor(sumx))))==-2)[0][0]
-    dy=1+numpy.where(numpy.diff(numpy.sign(numpy.diff(autocor(sumx))))==-2)[0][0]
+    dy=1+numpy.where(numpy.diff(numpy.sign(numpy.diff(autocor(sumy))))==-2)[0][0]
     # Find all maxima
     maxx=1+numpy.where(numpy.diff(numpy.sign(numpy.diff(sumx)))==-2)[0]
     maxy=1+numpy.where(numpy.diff(numpy.sign(numpy.diff(sumy)))==-2)[0]
     # Find the nspots maxima whose mean intermaximum distance is most internally consistent
     varx,vary=[],[]
-    for i in xrange(0,len(maxx)-nx-1):
-        varx.append(numpy.var(numpy.diff(maxx[i:(i+nx)])))
-    for i in xrange(0,len(maxy)-ny-1):
-        vary.append(numpy.var(numpy.diff(maxy[i:(i+ny)])))
+    for i in xrange(0,len(maxx)-nx+1):
+        varpos=numpy.var(numpy.diff(maxx[i:(i+nx)]))
+        # Small penalty for deviations from centre of image
+        varpos+=0.01*max(maxx[i],arr.shape[1]-maxx[i+nx-1])
+        varx.append(varpos)
+    for i in xrange(0,len(maxy)-ny+1):
+        # Small penalty for deviations from centre of image
+        varpos=numpy.var(numpy.diff(maxy[i:(i+ny)]))
+        varpos+=0.01*max(maxy[i],arr.shape[0]-maxy[i+ny-1])
+        vary.append(varpos)
     candx=maxx[numpy.argmin(varx):(numpy.argmin(varx)+nx)]
     candy=maxy[numpy.argmin(vary):(numpy.argmin(vary)+ny)]
     # Output some plots
@@ -152,14 +211,31 @@ def initialGuess(intensities,counts):
     '''Construct non-parametric guesses for distributions of two components and use these to estimate Gaussian parameters'''
     # Get all maxima
     maxima=1+numpy.where(numpy.diff(numpy.sign(numpy.diff(counts)))==-2)[0]
-    maxima=maxima[counts[maxima]>0.01*numpy.sum(counts)]
-    
+    maxima=maxima[counts[maxima]>0.01*numpy.max(counts)]
+    # Get peak heights
+    heights=counts[maxima]
+    # Order maxima by peak heights
+    maxima=maxima[heights.argsort()]
     # Use first maximum of distribution as estimate of mean of first component
-    mu1=intensities[maxima[0]]
-    # Mirror curve from 0...mu1 to estimate distribution of first component
-    P1=numpy.concatenate((counts[0:mu1+1],counts[mu1-1::-1],numpy.zeros(len(counts)-2*mu1-1,dtype=numpy.int)))
+    #mu1=intensities[maxima[0]]
     # Use last maximum of distribution as estimate of mean of second component
-    mu2=intensities[maxima[-1]]
+    #mu2=intensities[maxima[-1]]
+    # Take two biggest peaks as means of two components
+    mu1=maxima[-1]
+    nextbig=maxima[maxima>1.1*mu1]
+    if(len(nextbig)>0):
+        mu2=nextbig[-1]
+    else:
+        mu2=int(round(1.5*mu1))
+    
+    # Mirror curve from 0...mu1 to estimate distribution of first component
+    P1=numpy.zeros(len(intensities),dtype=numpy.int)
+    halfpeak=counts[0:mu1]
+    for i in xrange(0,mu1):
+        P1[i]=halfpeak[i]
+    for i in xrange(mu1,len(intensities)):
+        P1[i]=halfpeak[min(len(halfpeak)-1,max(0,2*len(halfpeak)-i))]
+
     # Mirror curve for second peak also
     P2=numpy.zeros(len(intensities),dtype=numpy.int)
     halfpeak=counts[mu2:]
@@ -181,6 +257,7 @@ def initialGuess(intensities,counts):
     bindat=bindat[bindat.counts>0]
     bindat["frac"]=numpy.array(numpy.cumsum(bindat.counts),dtype=numpy.float)/numpy.sum(bindat.counts)
     bindat["freq"]=numpy.array(bindat.counts,dtype=numpy.float)/numpy.sum(bindat.counts)
+    #plotGuess(bindat)
     return((bindat,[theta,mu1,mu2,sigma1,sigma2]))
 
 def totFunc(x,p):
@@ -282,9 +359,9 @@ def sizeSpots(locations,arr,thresharr,edge,background=0):
     sumInt,sumArea,trim,fMed,bMed,circ,fVar,perim=[],[],[],[],[],[],[],[]
     for i in xrange(0,len(locations.x.values)):
         x,y,rad=locations.x.values[i],locations.y.values[i],int(math.ceil(max(locations.Diameter.values)/2.0))
-        tile=arr[y-rad:(y+rad+1),x-rad:(x+rad+1)]-background
-        threshtile=thresharr[y-rad:(y+rad+1),x-rad:(x+rad+1)]
-        edgetile=edge[y-rad:(y+rad+1),x-rad:(x+rad+1)]
+        tile=arr[max(0,y-rad):min(arr.shape[0],(y+rad+1)),max(0,x-rad):min(arr.shape[1],(x+rad+1))]-background
+        threshtile=thresharr[max(0,y-rad):min(arr.shape[0],(y+rad+1)),max(0,x-rad):min(arr.shape[1],(x+rad+1))]
+        edgetile=edge[max(0,y-rad):min(arr.shape[0],(y+rad+1)),max(0,x-rad):min(arr.shape[1],(x+rad+1))]
         perimeter=numpy.sum(edgetile)
         area=numpy.sum(threshtile)
         if perimeter>0:
@@ -376,6 +453,23 @@ start=time.time()
 syspath = os.path.dirname(sys.argv[0])
 fullpath = os.path.abspath(syspath)
 
+# Try to read in the Colonyzer input file
+Instructions=open(os.path.join(fullpath,'Colonyzer.txt'),'r')
+InsData={}
+InsTemp=Instructions.readlines()
+
+for x in xrange(0,len(InsTemp)):
+    if InsTemp[x][0]!="#" and InsTemp[x][0]!="\n":
+        tlist=InsTemp[x].split(',')
+        if len(tlist)>1:
+            InsData[tlist[0]]=[tlist[1],int(tlist[2]),int(tlist[3]),int(tlist[4]),int(tlist[5])]
+
+if 'default' in InsData:
+    SetUp(InsData['default'])
+else:
+    print "ERROR: No default instructions"
+    sys.exit()
+
 # Create directories for storing output data and preview images
 try:
     os.mkdir(os.path.join(fullpath,"Output_Images"))
@@ -387,14 +481,13 @@ outputimages=os.path.join(fullpath,"Output_Images")
 outputdata=os.path.join(fullpath,"Output_Data")
 
 allfiles=os.listdir(fullpath)
-alldats=os.listdir(os.path.join(fullpath,"Output_Data"))
-barcRange=(0,11) # Read this in from Colonyzer.txt?
-#barcsDone=list(numpy.unique([dat[barcRange[0]:barcRange[1]] for dat in alldats]))
-barcsDone=[]
+alldats=os.listdir(outputdata)
+barcRange=(0,15) # Read this in from Colonyzer.txt?
+barcsDone=list(numpy.unique([dat[barcRange[0]:barcRange[1]] for dat in alldats]))
 barcdict={}
 for filename in allfiles:
     barc=filename[barcRange[0]:barcRange[1]]
-    if filename[-4:] in ('.jpg','.JPG') and barc not in barcsDone:
+    if filename[-4:] in ('.jpg','.JPG'):
         if barc not in barcdict:
             barcdict[barc]=[filename]
         else:
@@ -403,115 +496,129 @@ for b in barcdict:
     barcdict[b].sort(reverse=True)
 
 for BARCODE in barcdict.keys():
-    LATESTIMAGE=barcdict[BARCODE][0]
-    EARLIESTIMAGE=barcdict[BARCODE][-1]
-    im=Image.open(LATESTIMAGE)
-    img=im.convert("F")
-    arrN=numpy.array(img,dtype=numpy.float)
-        
-    nx,ny=24,16
-    diam=int(round(min(float(arrN.shape[0])/ny,float(arrN.shape[1])/nx)))
-    (candx,candy,dx,dy)=estimateLocations(arrN,diam,showPlt=False)
-    xloc,yloc=numpy.meshgrid(candx,candy)
-    cols,rows=numpy.meshgrid(numpy.arange(1,nx+1),numpy.arange(1,ny+1))
-    d={"Row":rows.flatten(),"Column":cols.flatten(),"y":yloc.flatten(),"x":xloc.flatten()}
-    locations=pandas.DataFrame(d)
-    rad=int(round(float(min(dx,dy))/2.0))
-    RAD=int(round(1.2*rad))
-    RAD=rad/6
-    for i in xrange(0,len(locations.x)):
-        (x,y)=optimiseSpot(arrN,locations.x[i],locations.y[i],rad,RAD)
-        locations.x[i]=x
-        locations.y[i]=y
-    locations["Diameter"]=min(dx,dy)
-    print("Cultures located")
-
-    # Analyse first image to allow lighting correction
-    im0=Image.open(EARLIESTIMAGE)
-    img=im0.convert("F")
-    arr0=numpy.array(img,dtype=numpy.float)
-    smoothed_arr=ndimage.gaussian_filter(arr0,arr0.shape[1]/500)
-    average_back=numpy.mean(smoothed_arr[numpy.min(locations.y):numpy.max(locations.y),numpy.min(locations.x):numpy.max(locations.x)])
-    correction_map=average_back/smoothed_arr
-
-    print("Lighting correction map constructed")
-
-    # Apply lighting correction to last image
-    corrected_arr=arrN*correction_map
-
-    # Threshold corrected image
-    # Initial guess for mixed model parameters for thresholding lighting corrected image
-    # Trim outer part of image to remove plate walls
-    trimmed_arr=corrected_arr[max(0,min(locations.y)-dy):min(arr0.shape[0],(max(locations.y)+dy)),max(0,(min(locations.x)-dx)):min(arr0.shape[1],(max(locations.x)+dx))]
-    (counts,intensities)=numpy.histogram(trimmed_arr,bins=2**8,range=(0,2**8))
-    intensities=numpy.array(intensities[0:-1],dtype=numpy.int)
-    smoothcounts=ndimage.gaussian_filter1d(counts,1)
-    (bindat,[theta,mu1,mu2,sigma1,sigma2])=initialGuess(intensities,smoothcounts)
-
-    # Maximise likelihood of 2-component mixed Gaussian model parameters given binned observations by constrained optimisation
-    logL=makeObjective(bindat.intensities,bindat.counts,totFunc)
-    b=[(0.0,1.0),(float(mu1)/5.0,5*float(mu1)),(float(mu2)/5.0,5.0*float(mu2)),(float(sigma1)/5.0,5.0*float(sigma1)),(float(sigma2)/5.0,5.0*float(sigma2))]
-    opt=optimize.fmin_l_bfgs_b(logL,[theta,mu1,mu2,sigma1,sigma2],bounds=b,approx_grad=True)
-    [theta_opt,mu1_opt,mu2_opt,sigma1_opt,sigma2_opt]=opt[0]
-
-    # Best estimate for threshold is point of intersection of two fitted component Gaussians
-    thresh=getRoot(opt[0],intensities)
-    thresh0=int(round(thresh))
-    thresh1=thresh0
-
-    # Make threshold as low as possible, for maximum sensitivity
-    while smoothcounts[thresh1]>=smoothcounts[thresh1-1]:
-        thresh1-=1
-
-    # Save final mask for cutting out all cell signal from earlier images
-    finalMask=numpy.ones(arrN.shape,dtype=numpy.bool)
-    finalMask[arrN<thresh1]=False
-
-    # Modelled densities
-    bindat["mixed"]=numpy.array([totFunc(x,opt[0]) for x in bindat.intensities],dtype=numpy.float)
-    bindat["gauss1"]=numpy.array([theta_opt*stats.norm.pdf(x,mu1_opt,sigma1_opt) for x in bindat.intensities],dtype=numpy.float)
-    bindat["gauss2"]=numpy.array([(1.0-theta_opt)*stats.norm.pdf(x,mu2_opt,sigma2_opt) for x in bindat.intensities],dtype=numpy.float)
-
-    #plotGuess(bindat)
-    #plotModel(bindat,(thresh0,thresh1))
-
-    # Find culture area as a function of threshold value
-    #cellarea=[arr[arr>i].size for i in xrange(0,256)]
-
-    # Free up some memory
-    del arr0,arrN, smoothed_arr
-
-    print("Threshold located")
-    barcdict[BARCODE].sort()
-    for FILENAME in barcdict[BARCODE]:
-        print FILENAME
-        im=Image.open(FILENAME)
+    # Check if plate is already being analysed
+    alldats=os.listdir(outputdata)
+    barcsDone=list(numpy.unique([dat[barcRange[0]:barcRange[1]] for dat in alldats]))
+    if BARCODE not in barcsDone:
+        tmp=open(os.path.join(outputdata,barcdict[BARCODE][-1][0:-4]+".dat"),"w")
+        tmp.close()
+        print(BARCODE)
+        LATESTIMAGE=barcdict[BARCODE][0]
+        EARLIESTIMAGE=barcdict[BARCODE][-1]
+        im=Image.open(LATESTIMAGE)
         img=im.convert("F")
-        arr=numpy.array(img,dtype=numpy.float)
-        # Correct spatial gradient
-        arr=arr*correction_map
-        arrsm=arr[numpy.min(locations.y):numpy.max(locations.y),numpy.min(locations.x):numpy.max(locations.x)]
-        masksm=finalMask[numpy.min(locations.y):numpy.max(locations.y),numpy.min(locations.x):numpy.max(locations.x)]
-        meanPx=numpy.mean(arrsm[numpy.logical_not(masksm)])
-        # Correct lighting differences
-        arr=arr+(average_back-meanPx)
-        mask=numpy.ones(arr.shape,dtype=numpy.bool)
-        mask[arr<thresh1]=False
-        imthresh=thresholdArr(numpy.copy(arr),thresh1)
-        edge=getEdges(arr,0.925)
-        locations=sizeSpots(locations,arr,mask,edge,average_back)
-        locations=getColours(im,locations,mask)
-        locations["Barcode"]=BARCODE
-        locations["Filename"]=FILENAME[0:-4]
-        locations.to_csv(os.path.join(outputdata,FILENAME[0:-4]+".out"),"\t",index=False)
-        dataf=saveColonyzer(os.path.join(outputdata,FILENAME[0:-4]+".dat"),locations,thresh1,dx,dy)
-        imthresh=imthresh.convert("RGB")
-        draw=ImageDraw.Draw(imthresh)
-        colours=((255,0,0),(0,255,0),(0,0,255),(255,255,0),(0,255,255),(255,0,255))
+        arrN=numpy.array(img,dtype=numpy.float)
+            
+        nx,ny=24,16
+        diam=int(1.05*round(min(float(arrN.shape[0])/(ny+1),float(arrN.shape[1])/(nx+1))))
+
+##        # If we have special instructions for the filename, use those, otherwise use default
+##        if LATESTIMAGE in InsData:
+##            (candx,candy,dx,dy)=SetUp(InsData[LATESTIMAGE])
+##        else:
+##            (candx,candy,dx,dy)=SetUp(InsData['default'])
+    
+        (candx,candy,dx,dy)=estimateLocations(arrN,diam,showPlt=True)
+        xloc,yloc=numpy.meshgrid(candx,candy)
+        cols,rows=numpy.meshgrid(numpy.arange(1,nx+1),numpy.arange(1,ny+1))
+        d={"Row":rows.flatten(),"Column":cols.flatten(),"y":yloc.flatten(),"x":xloc.flatten()}
+        locations=pandas.DataFrame(d)
+        rad=int(round(float(min(dx,dy))/2.0))
+        RAD=int(round(1.2*rad))
+        RAD=rad/6
         for i in xrange(0,len(locations.x)):
-            x,y,r=int(round(locations.x[i])),int(round(locations.y[i])),int(round(float(locations.Diameter[i])/2.0))
-            draw.rectangle((x-r,y-r,x+r,y+r),outline=colours[i%5])
-        imthresh.save(os.path.join(outputimages,FILENAME[0:-4]+".png"))
-    print("Finished: "+str(time.time()-start)+" s")
+            (x,y)=optimiseSpot(arrN,locations.x[i],locations.y[i],rad,RAD)
+            locations.x[i]=x
+            locations.y[i]=y
+        locations["Diameter"]=min(dx,dy)
+        print("Cultures located")
+
+        # Analyse first image to allow lighting correction
+        im0=Image.open(EARLIESTIMAGE)
+        img=im0.convert("F")
+        arr0=numpy.array(img,dtype=numpy.float)
+        smoothed_arr=ndimage.gaussian_filter(arr0,arr0.shape[1]/250)
+        average_back=numpy.mean(smoothed_arr[numpy.min(locations.y):numpy.max(locations.y),numpy.min(locations.x):numpy.max(locations.x)])
+        correction_map=average_back/smoothed_arr
+
+        print("Lighting correction map constructed")
+
+        # Apply lighting correction to last image
+        corrected_arr=arrN*correction_map
+
+        # Threshold corrected image
+        # Initial guess for mixed model parameters for thresholding lighting corrected image
+        # Trim outer part of image to remove plate walls
+        trimmed_arr=corrected_arr[max(0,min(locations.y)-dy):min(arr0.shape[0],(max(locations.y)+dy)),max(0,(min(locations.x)-dx)):min(arr0.shape[1],(max(locations.x)+dx))]
+        (counts,intensities)=numpy.histogram(trimmed_arr,bins=2**8,range=(0,2**8))
+        intensities=numpy.array(intensities[0:-1],dtype=numpy.int)
+        smoothcounts=ndimage.gaussian_filter1d(counts,1)
+        (bindat,[theta,mu1,mu2,sigma1,sigma2])=initialGuess(intensities,smoothcounts)
+
+        # Maximise likelihood of 2-component mixed Gaussian model parameters given binned observations by constrained optimisation
+        logL=makeObjective(bindat.intensities,bindat.counts,totFunc)
+        b=[(0.0,1.0),(float(mu1)/5.0,5*float(mu1)),(float(mu2)/5.0,5.0*float(mu2)),(float(sigma1)/5.0,5.0*float(sigma1)),(float(sigma2)/5.0,5.0*float(sigma2))]
+        opt=optimize.fmin_l_bfgs_b(logL,[theta,mu1,mu2,sigma1,sigma2],bounds=b,approx_grad=True)
+        [theta_opt,mu1_opt,mu2_opt,sigma1_opt,sigma2_opt]=opt[0]
+
+        # Best estimate for threshold is point of intersection of two fitted component Gaussians
+        thresh=getRoot(opt[0],intensities)
+        thresh0=int(round(thresh))
+        thresh1=thresh0
+
+        # Make threshold as low as possible, for maximum sensitivity
+        while smoothcounts[thresh1]>=smoothcounts[thresh1-1]:
+            thresh1-=1
+
+        # Save final mask for cutting out all cell signal from earlier images
+        finalMask=numpy.ones(arrN.shape,dtype=numpy.bool)
+        finalMask[arrN<thresh1]=False
+
+        # Modelled densities
+        bindat["mixed"]=numpy.array([totFunc(x,opt[0]) for x in bindat.intensities],dtype=numpy.float)
+        bindat["gauss1"]=numpy.array([theta_opt*stats.norm.pdf(x,mu1_opt,sigma1_opt) for x in bindat.intensities],dtype=numpy.float)
+        bindat["gauss2"]=numpy.array([(1.0-theta_opt)*stats.norm.pdf(x,mu2_opt,sigma2_opt) for x in bindat.intensities],dtype=numpy.float)
+
+        plotGuess(bindat)
+        plotModel(bindat,(thresh0,thresh1))
+
+        # Find culture area as a function of threshold value
+        #cellarea=[arr[arr>i].size for i in xrange(0,256)]
+
+        # Free up some memory
+        del arr0,arrN, smoothed_arr
+
+        print("Threshold located")
+        barcdict[BARCODE].sort()
+        for FILENAME in barcdict[BARCODE]:
+            print FILENAME
+            im=Image.open(FILENAME)
+            img=im.convert("F")
+            arr=numpy.array(img,dtype=numpy.float)
+            # Correct spatial gradient
+            arr=arr*correction_map
+            arrsm=arr[numpy.min(locations.y):numpy.max(locations.y),numpy.min(locations.x):numpy.max(locations.x)]
+            masksm=finalMask[numpy.min(locations.y):numpy.max(locations.y),numpy.min(locations.x):numpy.max(locations.x)]
+            meanPx=numpy.mean(arrsm[numpy.logical_not(masksm)])
+            # Correct lighting differences
+            arr=arr+(average_back-meanPx)
+            mask=numpy.ones(arr.shape,dtype=numpy.bool)
+            mask[arr<thresh1]=False
+            imthresh=thresholdArr(numpy.copy(arr),thresh1)
+            edge=getEdges(arr,0.925)
+            locations=sizeSpots(locations,arr,mask,edge,average_back)
+            locations=getColours(im,locations,mask)
+            locations["Barcode"]=BARCODE
+            locations["Filename"]=FILENAME[0:-4]
+            locations.to_csv(os.path.join(outputdata,FILENAME[0:-4]+".out"),"\t",index=False)
+            dataf=saveColonyzer(os.path.join(outputdata,FILENAME[0:-4]+".dat"),locations,thresh1,dx,dy)
+            imthresh=imthresh.convert("RGB")
+            draw=ImageDraw.Draw(imthresh)
+            colours=((255,0,0),(0,255,0),(0,0,255),(255,255,0),(0,255,255),(255,0,255))
+            for i in xrange(0,len(locations.x)):
+                x,y,r=int(round(locations.x[i])),int(round(locations.y[i])),int(round(float(locations.Diameter[i])/2.0))
+                draw.rectangle((x-r,y-r,x+r,y+r),outline=colours[i%5])
+            imthresh.save(os.path.join(outputimages,FILENAME[0:-4]+".png"))
+        print("Finished: "+str(time.time()-start)+" s")
 
 		
