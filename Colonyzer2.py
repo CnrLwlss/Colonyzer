@@ -518,7 +518,7 @@ for BARCODE in barcdict.keys():
 ##        else:
 ##            (candx,candy,dx,dy)=SetUp(InsData['default'])
     
-        (candx,candy,dx,dy)=estimateLocations(arrN,diam,showPlt=True)
+        (candx,candy,dx,dy)=estimateLocations(arrN,diam,showPlt=False)
         xloc,yloc=numpy.meshgrid(candx,candy)
         cols,rows=numpy.meshgrid(numpy.arange(1,nx+1),numpy.arange(1,ny+1))
         d={"Row":rows.flatten(),"Column":cols.flatten(),"y":yloc.flatten(),"x":xloc.flatten()}
@@ -579,8 +579,8 @@ for BARCODE in barcdict.keys():
         bindat["gauss1"]=numpy.array([theta_opt*stats.norm.pdf(x,mu1_opt,sigma1_opt) for x in bindat.intensities],dtype=numpy.float)
         bindat["gauss2"]=numpy.array([(1.0-theta_opt)*stats.norm.pdf(x,mu2_opt,sigma2_opt) for x in bindat.intensities],dtype=numpy.float)
 
-        plotGuess(bindat)
-        plotModel(bindat,(thresh0,thresh1))
+        #plotGuess(bindat)
+        #plotModel(bindat,(thresh0,thresh1))
 
         # Find culture area as a function of threshold value
         #cellarea=[arr[arr>i].size for i in xrange(0,256)]
