@@ -140,6 +140,9 @@ def estimateLocations(arr,diam=20,showPlt=True,pdfPlt=False):
     # Generate windowed mean intensities, scanning along x and y axes
     sumx=numpy.array([numpy.mean(arr[0:arr.shape[0],numpy.max([0,dx-diam/4]):numpy.min([arr.shape[1],dx+diam/4])]) for dx in xrange(0,arr.shape[1])],dtype=numpy.float)
     sumy=numpy.array([numpy.mean(arr[numpy.max([0,dy-diam/4]):numpy.min([arr.shape[0],dy+diam/4]),0:arr.shape[1]]) for dy in xrange(0,arr.shape[0])],dtype=numpy.float)
+    # Smooth intensities to help eliminate small local maxima
+    sumx=ndimage.gaussian_filter1d(sumx,diam/10)
+    sumy=ndimage.gaussian_filter1d(sumy,diam/10)
     # First peak in autocorrelation function is best estimate of distance between spots
     dx=1+numpy.where(numpy.diff(numpy.sign(numpy.diff(autocor(sumx))))==-2)[0][0]
     dy=1+numpy.where(numpy.diff(numpy.sign(numpy.diff(autocor(sumy))))==-2)[0][0]
@@ -151,12 +154,14 @@ def estimateLocations(arr,diam=20,showPlt=True,pdfPlt=False):
     for i in xrange(0,len(maxx)-nx+1):
         varpos=numpy.var(numpy.diff(maxx[i:(i+nx)]))
         # Small penalty for deviations from centre of image
-        varpos+=0.01*max(maxx[i],arr.shape[1]-maxx[i+nx-1])
+        #varpos+=0.01*max(maxx[i],arr.shape[1]-maxx[i+nx-1])
+        varpos+=abs(maxx[i]-(arr.shape[1]-maxx[i+nx-1]))/dx
         varx.append(varpos)
     for i in xrange(0,len(maxy)-ny+1):
         # Small penalty for deviations from centre of image
         varpos=numpy.var(numpy.diff(maxy[i:(i+ny)]))
-        varpos+=0.01*max(maxy[i],arr.shape[0]-maxy[i+ny-1])
+        #varpos+=0.01*max(maxy[i],arr.shape[0]-maxy[i+ny-1])
+        varpos+=abs(maxy[i]-(arr.shape[0]-maxy[i+ny-1]))/dy
         vary.append(varpos)
     candx=maxx[numpy.argmin(varx):(numpy.argmin(varx)+nx)]
     candy=maxy[numpy.argmin(vary):(numpy.argmin(vary)+ny)]
