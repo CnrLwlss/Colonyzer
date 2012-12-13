@@ -154,15 +154,17 @@ def estimateLocations(arr,diam=20,showPlt=True,pdfPlt=False):
     for i in xrange(0,len(maxx)-nx+1):
         varpos=numpy.var(numpy.diff(maxx[i:(i+nx)]))
         # Small penalty for deviations from centre of image
-        #varpos+=0.01*max(maxx[i],arr.shape[1]-maxx[i+nx-1])
-        varpos+=abs(maxx[i]-(arr.shape[1]-maxx[i+nx-1]))/dx
-        varx.append(varpos)
+        #symmpen=0.01*max(maxx[i],arr.shape[1]-maxx[i+nx-1])
+        symmpen=10*abs(maxx[i]-(arr.shape[1]-maxx[i+nx-1]))/dx
+        print "x: ",varpos,symmpen
+        varx.append(varpos+symmpen)
     for i in xrange(0,len(maxy)-ny+1):
         # Small penalty for deviations from centre of image
         varpos=numpy.var(numpy.diff(maxy[i:(i+ny)]))
-        #varpos+=0.01*max(maxy[i],arr.shape[0]-maxy[i+ny-1])
-        varpos+=abs(maxy[i]-(arr.shape[0]-maxy[i+ny-1]))/dy
-        vary.append(varpos)
+        #symmpen=0.01*max(maxy[i],arr.shape[0]-maxy[i+ny-1])
+        symmpen=10*abs(maxy[i]-(arr.shape[0]-maxy[i+ny-1]))/dy
+        print "y: ",varpos,symmpen
+        vary.append(varpos+symmpen)
     candx=maxx[numpy.argmin(varx):(numpy.argmin(varx)+nx)]
     candy=maxy[numpy.argmin(vary):(numpy.argmin(vary)+ny)]
     # Output some plots
