@@ -24,6 +24,9 @@ def SetUp(instructarr):
         nocols,norows = 48,32
     elif NoSpots==768:
         nocols,norows = 48,32
+    # Special request by Marcin Plech
+    elif NoSpots==117:
+        nocols,norows = 13,9
     elif NoSpots==96:
         nocols,norows = 12,8
     elif NoSpots==48:
@@ -136,7 +139,7 @@ def showIm(arr,returnIm=False):
         imnew.show()
 
 def estimateLocations(arr,diam=20,showPlt=True,pdfPlt=False):
-    '''Automatically search for best estimate for location of culture array'''
+    '''Automatically search for best estimate for location of culture grid in image data (arr).'''
     # Generate windowed mean intensities, scanning along x and y axes
     sumx=numpy.array([numpy.mean(arr[0:arr.shape[0],numpy.max([0,dx-diam/4]):numpy.min([arr.shape[1],dx+diam/4])]) for dx in xrange(0,arr.shape[1])],dtype=numpy.float)
     sumy=numpy.array([numpy.mean(arr[numpy.max([0,dy-diam/4]):numpy.min([arr.shape[0],dy+diam/4]),0:arr.shape[1]]) for dy in xrange(0,arr.shape[0])],dtype=numpy.float)
@@ -456,6 +459,9 @@ def saveColonyzer(filename,locs,thresh,dx,dy):
 
 start=time.time()
 
+# To switch to manual thresholding set this to a value greater than 0
+manualThreshold=0
+
 # Current directory
 syspath = os.path.dirname(sys.argv[0])
 fullpath = os.path.abspath(syspath)
@@ -494,7 +500,7 @@ barcsDone=list(numpy.unique([dat[barcRange[0]:barcRange[1]] for dat in alldats])
 barcdict={}
 for filename in allfiles:
     barc=filename[barcRange[0]:barcRange[1]]
-    if filename[-4:] in ('.jpg','.JPG'):
+    if filename[-4:] in ('.jpg','.JPG','.tiff','.TIFF','.tif','.TIF'):
         if barc not in barcdict:
             barcdict[barc]=[filename]
         else:
@@ -513,6 +519,8 @@ for BARCODE in barcdict.keys():
         LATESTIMAGE=barcdict[BARCODE][0]
         EARLIESTIMAGE=barcdict[BARCODE][-1]
         im=Image.open(LATESTIMAGE)
+        # Strip alpha channel if present
+        im = im.convert("RGB")
         img=im.convert("F")
         arrN=numpy.array(img,dtype=numpy.float)
             
@@ -569,7 +577,10 @@ for BARCODE in barcdict.keys():
         [theta_opt,mu1_opt,mu2_opt,sigma1_opt,sigma2_opt]=opt[0]
 
         # Best estimate for threshold is point of intersection of two fitted component Gaussians
-        thresh=getRoot(opt[0],intensities)
+        if manualThreshold==0:
+            thresh=getRoot(opt[0],intensities)
+        else:
+            thresh=manualThreshold
         thresh0=int(round(thresh))
         thresh1=thresh0
 
@@ -600,6 +611,8 @@ for BARCODE in barcdict.keys():
         for FILENAME in barcdict[BARCODE]:
             print FILENAME
             im=Image.open(FILENAME)
+            # Strip alpha channel if present
+            im = im.convert("RGB")
             img=im.convert("F")
             arr=numpy.array(img,dtype=numpy.float)
             # Correct spatial gradient
@@ -609,6 +622,7 @@ for BARCODE in barcdict.keys():
             meanPx=numpy.mean(arrsm[numpy.logical_not(masksm)])
             # Correct lighting differences
             arr=arr+(average_back-meanPx)
+            thresh1=thresh1+(average_back-meanPx)
             mask=numpy.ones(arr.shape,dtype=numpy.bool)
             mask[arr<thresh1]=False
             imthresh=thresholdArr(numpy.copy(arr),thresh1)
