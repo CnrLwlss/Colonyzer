@@ -159,14 +159,12 @@ def estimateLocations(arr,diam=20,showPlt=True,pdfPlt=False):
         # Small penalty for deviations from centre of image
         #symmpen=0.01*max(maxx[i],arr.shape[1]-maxx[i+nx-1])
         symmpen=10*abs(maxx[i]-(arr.shape[1]-maxx[i+nx-1]))/dx
-        print "x: ",varpos,symmpen
         varx.append(varpos+symmpen)
     for i in xrange(0,len(maxy)-ny+1):
         # Small penalty for deviations from centre of image
         varpos=numpy.var(numpy.diff(maxy[i:(i+ny)]))
         #symmpen=0.01*max(maxy[i],arr.shape[0]-maxy[i+ny-1])
         symmpen=10*abs(maxy[i]-(arr.shape[0]-maxy[i+ny-1]))/dy
-        print "y: ",varpos,symmpen
         vary.append(varpos+symmpen)
     candx=maxx[numpy.argmin(varx):(numpy.argmin(varx)+nx)]
     candy=maxy[numpy.argmin(vary):(numpy.argmin(vary)+ny)]
@@ -457,101 +455,115 @@ def saveColonyzer(filename,locs,thresh,dx,dy):
     dataf.to_csv(filename,"\t",index=False,header=False,cols=colorder)
     return(dataf)
 
+def getInstructions(fname="Colonyzer.txt",imroot="xXxXxX"):
+    '''Generate location estimates for spots by reading in location estimates for top left and bottom right spot, together with spotting format, from a text file.'''
+    # Try to read in the Colonyzer input file
+    Instructions=open(os.path.join(fullpath,'Colonyzer.txt'),'r')
+    InsData={}
+    InsTemp=Instructions.readlines()
+    for x in xrange(0,len(InsTemp)):
+        if InsTemp[x][0]!="#" and InsTemp[x][0]!="\n":
+            tlist=InsTemp[x].split(',')
+            if len(tlist)>1:
+                InsData[tlist[0]]=[tlist[1],int(tlist[2]),int(tlist[3]),int(tlist[4]),int(tlist[5])]
+
+    if imroot in InsData:
+        (candx,candy,xdim,ydim)=SetUp(InsData[imroot])
+    if 'default' in InsData:
+        (candx,candy,xdim,ydim)=SetUp(InsData['default'])
+    else:
+        print "ERROR: No default instructions"
+        sys.exit()
+    return((candx,candy,xdim,ydim))
+
+def setDirectories():
+    '''Create subdirectories within the current directory for storing images and output data.  Return paths to new directories.'''
+    # Current directory
+    syspath = os.path.dirname(sys.argv[0])
+    fullpath = os.path.abspath(syspath)
+
+    outputimages=os.path.join(fullpath,"Output_Images")
+    outputdata=os.path.join(fullpath,"Output_Data")
+
+    # Create directories for storing output data and preview images
+    try:
+        os.mkdir(outputimages)
+        os.mkdir(outputdata)
+    except:
+        print("Output directories already present")
+    return((outputimages,outputdata,fullpath))
+
+def imagesToProcess(imagedir,datadir):
+    '''Get dictionary of image files for processing, grouped by filename root (e.g. barcode),'''
+    allfiles=os.listdir(imagedir)
+    alldats=os.listdir(datadir)
+    barcRange=(0,15) # Read this in from Colonyzer.txt?
+    barcsDone=list(numpy.unique([dat[barcRange[0]:barcRange[1]] for dat in alldats]))
+    barcdict={}
+    for filename in allfiles:
+        barc=filename[barcRange[0]:barcRange[1]]
+        if filename[-4:] in ('.jpg','.JPG','.tiff','.TIFF','.tif','.TIF'):
+            if barc not in barcdict:
+                barcdict[barc]=[filename]
+            else:
+                barcdict[barc].append(filename)
+    for b in barcdict:
+        barcdict[b].sort(reverse=True)
+    return(barcdict,barcsDone)
+
+def makeLocations(candx,candy,dx,dy,nx,ny):
+    '''Build pandas dataframe storing culture locations.'''
+    xloc,yloc=numpy.meshgrid(candx,candy)
+    cols,rows=numpy.meshgrid(numpy.arange(1,nx+1),numpy.arange(1,ny+1))
+    d={"Row":rows.flatten(),"Column":cols.flatten(),"y":yloc.flatten(),"x":xloc.flatten()}
+    locations=pandas.DataFrame(d)
+    rad=int(round(float(min(dx,dy))/2.0))
+    RAD=int(round(1.2*rad))
+    RAD=rad/6
+    for i in xrange(0,len(locations.x)):
+        (x,y)=optimiseSpot(arrN,locations.x[i],locations.y[i],rad,RAD)
+        locations.x[i]=x
+        locations.y[i]=y
+    locations["Diameter"]=min(dx,dy)
+    print("Cultures located")
+    return(locations)
+
+def openImage(fname):
+    '''Open image file, strip alpha channel, return image object, array object'''
+    im=Image.open(fname)
+    im=im.convert("RGB") # Strip alpha channel, if present
+    img=im.convert("F")
+    arr=numpy.array(img,dtype=numpy.float)
+    return(im,arr)
+    
 start=time.time()
 
 # To switch to manual thresholding set this to a value greater than 0
 manualThreshold=0
-
-# Current directory
-syspath = os.path.dirname(sys.argv[0])
-fullpath = os.path.abspath(syspath)
-
-# Try to read in the Colonyzer input file
-Instructions=open(os.path.join(fullpath,'Colonyzer.txt'),'r')
-InsData={}
-InsTemp=Instructions.readlines()
-
-for x in xrange(0,len(InsTemp)):
-    if InsTemp[x][0]!="#" and InsTemp[x][0]!="\n":
-        tlist=InsTemp[x].split(',')
-        if len(tlist)>1:
-            InsData[tlist[0]]=[tlist[1],int(tlist[2]),int(tlist[3]),int(tlist[4]),int(tlist[5])]
-
-if 'default' in InsData:
-    SetUp(InsData['default'])
-else:
-    print "ERROR: No default instructions"
-    sys.exit()
-
-# Create directories for storing output data and preview images
-try:
-    os.mkdir(os.path.join(fullpath,"Output_Images"))
-    os.mkdir(os.path.join(fullpath,"Output_Data"))
-except:
-    print("Output directories already present")
-
-outputimages=os.path.join(fullpath,"Output_Images")
-outputdata=os.path.join(fullpath,"Output_Data")
-
-allfiles=os.listdir(fullpath)
-alldats=os.listdir(outputdata)
-barcRange=(0,15) # Read this in from Colonyzer.txt?
-barcsDone=list(numpy.unique([dat[barcRange[0]:barcRange[1]] for dat in alldats]))
-barcdict={}
-for filename in allfiles:
-    barc=filename[barcRange[0]:barcRange[1]]
-    if filename[-4:] in ('.jpg','.JPG','.tiff','.TIFF','.tif','.TIF'):
-        if barc not in barcdict:
-            barcdict[barc]=[filename]
-        else:
-            barcdict[barc].append(filename)
-for b in barcdict:
-    barcdict[b].sort(reverse=True)
+(outputimages,outputdata,fullpath)=setDirectories()
+(barcdict,barcsDone)=imagesToProcess(fullpath,outputdata)
 
 for BARCODE in barcdict.keys():
-    # Check if plate is already being analysed
-    alldats=os.listdir(outputdata)
-    barcsDone=list(numpy.unique([dat[barcRange[0]:barcRange[1]] for dat in alldats]))
+    # Ensure that analysis of this set of plates has not already begun in another thread
+    (newdict,barcsDone)=imagesToProcess(fullpath,outputdata)
     if BARCODE not in barcsDone:
+        # Lock this set of images for current thread
         tmp=open(os.path.join(outputdata,barcdict[BARCODE][-1][0:-4]+".dat"),"w")
         tmp.close()
         print(BARCODE)
         LATESTIMAGE=barcdict[BARCODE][0]
         EARLIESTIMAGE=barcdict[BARCODE][-1]
-        im=Image.open(LATESTIMAGE)
-        # Strip alpha channel if present
-        im = im.convert("RGB")
-        img=im.convert("F")
-        arrN=numpy.array(img,dtype=numpy.float)
+        (im,arrN)=openImage(LATESTIMAGE)
             
         nx,ny=24,16
         diam=int(1.05*round(min(float(arrN.shape[0])/(ny+1),float(arrN.shape[1])/(nx+1))))
 
-##        # If we have special instructions for the filename, use those, otherwise use default
-##        if LATESTIMAGE in InsData:
-##            (candx,candy,dx,dy)=SetUp(InsData[LATESTIMAGE])
-##        else:
-##            (candx,candy,dx,dy)=SetUp(InsData['default'])
-    
+        #(candx,candy,dx,dy)=getInstructions()   
         (candx,candy,dx,dy)=estimateLocations(arrN,diam,showPlt=False)
-        xloc,yloc=numpy.meshgrid(candx,candy)
-        cols,rows=numpy.meshgrid(numpy.arange(1,nx+1),numpy.arange(1,ny+1))
-        d={"Row":rows.flatten(),"Column":cols.flatten(),"y":yloc.flatten(),"x":xloc.flatten()}
-        locations=pandas.DataFrame(d)
-        rad=int(round(float(min(dx,dy))/2.0))
-        RAD=int(round(1.2*rad))
-        RAD=rad/6
-        for i in xrange(0,len(locations.x)):
-            (x,y)=optimiseSpot(arrN,locations.x[i],locations.y[i],rad,RAD)
-            locations.x[i]=x
-            locations.y[i]=y
-        locations["Diameter"]=min(dx,dy)
-        print("Cultures located")
+        locations=makeLocations(candx,candy,dx,dy,nx,ny)
 
         # Analyse first image to allow lighting correction
-        im0=Image.open(EARLIESTIMAGE)
-        img=im0.convert("F")
-        arr0=numpy.array(img,dtype=numpy.float)
+        (im0,arr0)=openImage(EARLIESTIMAGE)
         smoothed_arr=ndimage.gaussian_filter(arr0,arr0.shape[1]/250)
         average_back=numpy.mean(smoothed_arr[numpy.min(locations.y):numpy.max(locations.y),numpy.min(locations.x):numpy.max(locations.x)])
         correction_map=average_back/smoothed_arr
@@ -610,11 +622,7 @@ for BARCODE in barcdict.keys():
         barcdict[BARCODE].sort()
         for FILENAME in barcdict[BARCODE]:
             print FILENAME
-            im=Image.open(FILENAME)
-            # Strip alpha channel if present
-            im = im.convert("RGB")
-            img=im.convert("F")
-            arr=numpy.array(img,dtype=numpy.float)
+            (im,arr)=openImage(FILENAME)
             # Correct spatial gradient
             arr=arr*correction_map
             arrsm=arr[numpy.min(locations.y):numpy.max(locations.y),numpy.min(locations.x):numpy.max(locations.x)]
