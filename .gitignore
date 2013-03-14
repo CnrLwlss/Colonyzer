@@ -1,4 +1,5 @@
 Output_Images/
 Output_Data/
 *.bak
+*.pyc
 dist/
