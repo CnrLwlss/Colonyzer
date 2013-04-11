@@ -1,3 +1,4 @@
+#!/usr/bin/env python -c
 from colonyzer2 import *
 
 # Lydall lab file naming convention
