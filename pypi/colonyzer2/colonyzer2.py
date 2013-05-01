@@ -452,8 +452,9 @@ def saveColonyzer(filename,locs,thresh,dx,dy):
 def setupDirectories():
     '''Create output directories and return paths for writing/reading files'''
     # Current directory
-    syspath = os.path.dirname(sys.argv[0])
-    fullpath = os.path.abspath(syspath)
+    #syspath = os.path.dirname(sys.argv[0])
+    #fullpath = os.path.abspath(syspath)
+    fullpath=os.getcwd()
 
     # Create directories for storing output data and preview images
     try:

@@ -1,0 +1,16 @@
+CHANGES.txt
+LICENSE.txt
+MANIFEST.in
+README.txt
+setup.py
+Colonyzer2.egg-info/PKG-INFO
+Colonyzer2.egg-info/SOURCES.txt
+Colonyzer2.egg-info/dependency_links.txt
+Colonyzer2.egg-info/entry_points.txt
+Colonyzer2.egg-info/top_level.txt
+bin/__init__.py
+bin/independent.py
+bin/timecourse.py
+colonyzer2/__init__.py
+colonyzer2/colonyzer2.py
+docs/Instructions.txt

@@ -1,4 +1,3 @@
-#!/usr/bin/env python -c
 from colonyzer2 import *
 
 start=time.time()
