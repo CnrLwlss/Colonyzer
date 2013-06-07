@@ -7,10 +7,10 @@ def main():
     print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
     start=time.time()
 
-    (fullpath,outputimages,outputdata)=colonyzer2.setupDirectories()
-    InsData=colonyzer2.readInstructions(fullpath)
+    (fullpath,outputimages,outputdata)=setupDirectories()
+    InsData=readInstructions(fullpath)
 
-    imList=colonyzer2.getImageNames(outputimages,outputdata,fullpath)
+    imList=getImageNames(outputimages,outputdata,fullpath)
 
     while len(imList)>0:
         imName=imList[0]
@@ -22,49 +22,49 @@ def main():
         tmp.close()
 
         # Get image and pixel array
-        im,arrN=colonyzer2.openImage(imName)
+        im,arrN=openImage(imName)
 
         # If we have ColonyzerParametryzer output for this filename, use it for initial culture location estimates
         if imName in InsData:
-            (candx,candy,dx,dy)=colonyzer2.SetUp(InsData[imName])
+            (candx,candy,dx,dy)=SetUp(InsData[imName])
         else:
-            (candx,candy,dx,dy)=colonyzer2.SetUp(InsData['default'])
+            (candx,candy,dx,dy)=SetUp(InsData['default'])
 
         # Automatically generate guesses for gridded array locations
         #(candx,candy,dx,dy)=estimateLocations(arrN,nx,ny,diam,showPlt=False)
 
         # Update guesses and initialise locations data frame
-        locations=colonyzer2.locateCultures(candx,candy,dx,dy,arrN)
+        locations=locateCultures(candx,candy,dx,dy,arrN)
 
         # Trim outer part of image to remove plate walls
         trimmed_arr=arrN[max(0,min(locations.y)-dy):min(arrN.shape[0],(max(locations.y)+dy)),max(0,(min(locations.x)-dx)):min(arrN.shape[1],(max(locations.x)+dx))]
-        (thresh,bindat)=colonyzer2.automaticThreshold(trimmed_arr)
+        (thresh,bindat)=automaticThreshold(trimmed_arr)
 
         print("Markov")
         # Cutout thresholded pixels and fill with Markov field
-        (finalMask,arrM)=colonyzer2.makeMask(arrN,thresh,9999999999)   
+        (finalMask,arrM)=makeMask(arrN,thresh,9999999999)   
         print("correction map")
         # Smooth (pseudo-)empty image 
         arr=numpy.copy(arrM)
-        (correction_map,average_back)=colonyzer2.makeCorrectionMap(arrM,locations)
+        (correction_map,average_back)=makeCorrectionMap(arrM,locations)
 
         # Correct spatial gradient
         arr=arrN*correction_map
         # Correct lighting differences
-        locations=colonyzer2.measureSizeAndColour(locations,arr,im,finalMask,average_back,imRoot,imRoot)
+        locations=measureSizeAndColour(locations,arr,im,finalMask,average_back,imRoot,imRoot)
 
         # Write results to file
         locations.to_csv(os.path.join(outputdata,imRoot+".out"),"\t",index=False)
-        dataf=colonyzer2.saveColonyzer(os.path.join(outputdata,imRoot+".dat"),locations,thresh,dx,dy)
+        dataf=saveColonyzer(os.path.join(outputdata,imRoot+".dat"),locations,thresh,dx,dy)
 
         # Visual check of culture locations
-        imthresh=colonyzer2.threshPreview(arr,thresh,locations)
+        imthresh=threshPreview(arr,thresh,locations)
         #imthresh.show()
         imthresh.save(os.path.join(outputimages,imRoot+".png"))
 
         # Get ready for next image
         print("Finished: "+str(time.time()-start)+" s")
-        imList=colonyzer2.getImageNames(outputimages,outputdata,fullpath)
+        imList=getImageNames(outputimages,outputdata,fullpath)
     print("No more images to analyse... I'm done.")
 
 if __name__ == '__main__':
