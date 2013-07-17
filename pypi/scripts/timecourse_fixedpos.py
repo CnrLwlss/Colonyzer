@@ -10,13 +10,11 @@ def main():
     # First 15 characters in filename identify unique plates
     # Remaining charaters can be used to store date, time etc.
     barcRange=(0,15)
+    correction=True
     if len(sys.argv)>1:
-        fmt=sys.argv[1]
-    
-##    # Format names and dimension definitions
-##    formats=["48","96","117","384","768","1536"]
-##    dims=[(6,8),(12,8),(13,9),(24,16),(48,32),(48,32)]
-##    nx,ny=dims[formats.index(fmt)] 
+        if '--nolc' in sys.argv:
+            print "No lighting correction..."
+            correction=False
 
     start=time.time()
 
@@ -65,7 +63,8 @@ def main():
 
         for FILENAME in barcdict[BARCODE]:
             im,arr=openImage(FILENAME)
-            arr=arr*correction_map
+            if correction:
+                arr=arr*correction_map
             
             # Correct for lighting differences between plates
             arrsm=arr[numpy.min(locationsN.y):numpy.max(locationsN.y),numpy.min(locationsN.x):numpy.max(locationsN.x)]

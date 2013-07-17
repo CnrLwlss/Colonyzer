@@ -75,7 +75,7 @@ def main(fmt="384"):
             locations=measureSizeAndColour(locationsN,arr,im,mask,average_back,BARCODE,FILENAME[0:-4])
 
             # Write results to file
-            locations.to_csv(os.path.join(outputdata,FILENAME[0:-4]+".out"),"\t",index=False)
+            locations.to_csv(os.path.join(outputdata,FILENAME[0:-4]+".out"),"\t",index=False,engine='python')
             dataf=saveColonyzer(os.path.join(outputdata,FILENAME[0:-4]+".dat"),locations,threshadj,dx,dy)
 
             # Visual check of culture locations
