@@ -1,4 +1,4 @@
-from colonyzer2 import *
+from colonyzer2.functions import *
 import time
 
 def main():
@@ -26,7 +26,12 @@ def main():
 
         # If we have ColonyzerParametryzer output for this filename, use it for initial culture location estimates
         if imName in InsData:
-            (candx,candy,dx,dy)=SetUp(InsData[imName])
+            (candx,candy,dx,dy)=SetUp(InsData[LATESTIMAGE])
+        # If there are multiple calibrations available, choose the best one based on date of image capture
+        elif any(isinstance(el, list) for el in InsData['default']):
+            imname=imName.split(".")[0]
+            imdate=imname[-19:-9]
+            (candx,candy,dx,dy)=SetUp(InsData['default'],imdate)
         else:
             (candx,candy,dx,dy)=SetUp(InsData['default'])
 

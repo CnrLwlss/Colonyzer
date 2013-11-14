@@ -4,6 +4,12 @@ Colonyzer
 
 Image analysis software for estimating cell density in arrayed microbial cultures growing on solid agar.  This module contains a set of functions for spot location, image segmentation and spot size estimation, suitable for quantifying culture size/cell density for libraries of microbial cultures growing on a solid agar surface.
 
+There are also a set of console scripts available for specific analysis jobs.  For example, after installation, executing::
+
+	timecourse
+
+on the commandline, will run a script to analyse a batch of timecourse images of microbial colonies growing up over time.  Detailed documentation can be found at the website below:
+	
 `Website <http://research.ncl.ac.uk/colonyzer/>`_ describing current, stable release.
 
 

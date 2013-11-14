@@ -1,4 +1,4 @@
-from colonyzer2 import *
+from colonyzer2.functions import *
 import time, sys
 
 def main(fmt="384"):
@@ -17,18 +17,23 @@ def main(fmt="384"):
     start=time.time()
 
     # Find image files which have yet to be analysed
-    (fullpath,outputimages,outputdata)=setupDirectories()
-    barcdict=getBarcodes(outputimages,outputdata,fullpath,barcRange)
+    barcdict=getBarcodes(os.getcwd(),barcRange)
+    # Setup output directories if not already present
+    rept=setupDirectories(barcdict)
+    if len(rept)>0:
+        print ("Newly created directories:")
+        for line in rept:
+            print rept
 
     while len(barcdict)>0:
         BARCODE=barcdict.keys()[0]
         print(BARCODE)
         LATESTIMAGE=barcdict[BARCODE][0]
         EARLIESTIMAGE=barcdict[BARCODE][-1]
-        imRoot=EARLIESTIMAGE.split(".")[0]
+        imRoot=os.path.basename(EARLIESTIMAGE).split(".")[0]
         
         # Indicate that barcode is currently being analysed, to allow parallel analysis
-        tmp=open(os.path.join(outputdata,imRoot+".dat"),"w").close()
+        tmp=open(os.path.splitext(EARLIESTIMAGE)[0]+".out","w").close()
 
         # Get latest image for thresholding and detecting culture locations
         imN,arrN=openImage(LATESTIMAGE)
@@ -84,7 +89,9 @@ def main(fmt="384"):
 
         # Get ready for next image
         print("Finished: "+FILENAME+" "+str(time.time()-start)+" s")
-        barcdict=getBarcodes(outputimages,outputdata,fullpath,barcRange)
+        barcdict=getBarcodes(os.getcwd(),barcRange)
+        # Setup output directories if not already present
+        rept=setupDirectories(barcdict)
     print("No more barcodes to analyse... I'm done.")
 
 if __name__ == '__main__':

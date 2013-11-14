@@ -1,6 +1,6 @@
 import pygame
 from pygame.locals import *
-import os,sys
+import os,sys,time
 
 # Let's find what directory we're in
 #syspath = os.path.dirname(sys.argv[0])
@@ -120,7 +120,7 @@ def SaveResults(Results,Format):
         NewRes.append(((int(round(float(ow)*float(x[0][0])/float(w))),int(round(float(oh)*float(x[0][1])/float(h)))),(int(round(float(ow)*float(x[1][0])/float(w))),int(round(float(oh)*float(x[1][1])/float(h))))))
     #print NewRes
 
-    defstring="default,%s,%s,%s,%s,%s"%(Format,str(NewRes[0][0][0]),str(NewRes[0][0][1]),str(NewRes[0][1][0]),str(NewRes[0][1][1]))
+    defstring="default,%s,%s,%s,%s,%s,%s"%(Format,str(NewRes[0][0][0]),str(NewRes[0][0][1]),str(NewRes[0][1][0]),str(NewRes[0][1][1]),time.strftime("%Y-%m-%d"))
 
     specstr=""
     for x in xrange(0,len(Results)):
@@ -134,12 +134,13 @@ def SaveResults(Results,Format):
 # Colonyzer information file
 ####################################
 # Please input comma-separated default values for:
-# No. of spots, top left spot x, top left spot y, bottom right spot x, bottom right spot y
+# No. of spots (e.g. 96,384 or 1536), top left spot x, top left spot y, bottom right spot x, bottom right spot y
 # Where the x and y coordinates refer to the centres of the spots
 # with y-axis increasing moving from top of image towards bottom
 # with x-axis increasing moving from left of image towards right.
 # This is the default reading you get hovering mouse pointer over
 # an image in ImageJ (http://rsbweb.nih.gov/ij/) for example.
+# Finally, add the calibration date in ISO format: YYYY-MM-DD to allow time-dependent calibrations
 # Note that the comma-separated list must be preceded by:
 # default
 ####################################
@@ -147,10 +148,10 @@ def SaveResults(Results,Format):
 """+defstring+"""
 
 ####################################
-# Please input any image specific differences here
+# Please input any image-specific differences here
 # same format as before, but include the filename 
 # of the image followed by spot no. and coordinates
-# as above
+# as above.  Calibration date should be omitted in this case.
 ####################################
 """+specstr
     #print OutString
