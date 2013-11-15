@@ -7,29 +7,36 @@ def main():
     print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
     start=time.time()
 
-    (fullpath,outputimages,outputdata)=setupDirectories()
-    InsData=readInstructions(fullpath)
+    InsData=readInstructions(os.getcwd())
 
-    imList=getImageNames(outputimages,outputdata,fullpath)
+    imList=getImageNames(os.getcwd())
+    # Setup output directories if not already present
+    rept=setupDirectories(imList)
+
+    # Disabling lighting correction
+    correction=True
+    if len(sys.argv)>1:
+        if '--nolc' in sys.argv:
+            print "No lighting correction..."
+            correction=False
 
     while len(imList)>0:
         imName=imList[0]
         print(imName)
-        imRoot=imName.split(".")[0]
+        imRoot=os.path.basename(imName).split(".")[0]
         
         # Indicate that imName is currently being analysed, to allow parallel analysis
-        tmp=open(os.path.join(outputdata,imRoot+".dat"),"w")
-        tmp.close()
+        tmp=open(os.path.join(os.path.dirname(imName),"Output_Data",os.path.basename(imName).split(".")[0]+".out"),"w").close()
 
         # Get image and pixel array
         im,arrN=openImage(imName)
 
         # If we have ColonyzerParametryzer output for this filename, use it for initial culture location estimates
         if imName in InsData:
-            (candx,candy,dx,dy)=SetUp(InsData[LATESTIMAGE])
+            (candx,candy,dx,dy)=SetUp(InsData[os.path.basename(imName)])
         # If there are multiple calibrations available, choose the best one based on date of image capture
         elif any(isinstance(el, list) for el in InsData['default']):
-            imname=imName.split(".")[0]
+            imname=os.path.basename(imName).split(".")[0]
             imdate=imname[-19:-9]
             (candx,candy,dx,dy)=SetUp(InsData['default'],imdate)
         else:
@@ -54,22 +61,25 @@ def main():
         (correction_map,average_back)=makeCorrectionMap(arrM,locations)
 
         # Correct spatial gradient
-        arr=arrN*correction_map
-        # Correct lighting differences
+        if correction:
+                arr=arr*correction_map
+        # Calculate intensity at each culture location
         locations=measureSizeAndColour(locations,arr,im,finalMask,average_back,imRoot,imRoot)
 
         # Write results to file
-        locations.to_csv(os.path.join(outputdata,imRoot+".out"),"\t",index=False,engine='python')
-        dataf=saveColonyzer(os.path.join(outputdata,imRoot+".dat"),locations,thresh,dx,dy)
+        locations.to_csv(os.path.join(os.path.dirname(imName),"Output_Data",os.path.basename(imName).split(".")[0]+".out"),"\t",index=False,engine='python')
+        dataf=saveColonyzer(os.path.join(os.path.dirname(imName),"Output_Data",os.path.basename(imName).split(".")[0]+".dat"),locations,threshadj,dx,dy)
 
         # Visual check of culture locations
         imthresh=threshPreview(arr,thresh,locations)
         #imthresh.show()
-        imthresh.save(os.path.join(outputimages,imRoot+".png"))
+        iimthresh.save(os.path.join(os.path.dirname(imName),"Output_Images",os.path.basename(imName).split(".")[0]+".png"))
 
         # Get ready for next image
         print("Finished: "+str(time.time()-start)+" s")
-        imList=getImageNames(outputimages,outputdata,fullpath)
+        imList=getImageNames(os.getcwd())
+        # Setup output directories if not already present
+        rept=setupDirectories(imList)
     print("No more images to analyse... I'm done.")
 
 if __name__ == '__main__':

@@ -2,16 +2,27 @@ from colonyzer2.functions import *
 import time, sys
 
 def main(fmt="384"):
+    # Plate format names and dimension definitions
+    formats=["48","96","117","384","768","1536"]
+    dims=[(6,8),(12,8),(13,9),(24,16),(48,32),(48,32)]
+    
     # Lydall lab file naming convention
     # First 15 characters in filename identify unique plates
     # Remaining charaters can be used to store date, time etc.
     barcRange=(0,15)
+
+    # Parse arguments... (use library for this...)
+    correction=True
     if len(sys.argv)>1:
-        fmt=sys.argv[1]
-    
-    # Format names and dimension definitions
-    formats=["48","96","117","384","768","1536"]
-    dims=[(6,8),(12,8),(13,9),(24,16),(48,32),(48,32)]
+        # Disabling lighting correction
+        if '--nolc' in sys.argv:
+            print "No lighting correction..."
+            correction=False
+        # Non-default plate formats
+        for fmat in formats:
+            if fmat in sys.argv:
+                fmt=fmat    
+
     nx,ny=dims[formats.index(fmt)] 
 
     start=time.time()
@@ -33,7 +44,7 @@ def main(fmt="384"):
         imRoot=os.path.basename(EARLIESTIMAGE).split(".")[0]
         
         # Indicate that barcode is currently being analysed, to allow parallel analysis
-        tmp=open(os.path.splitext(EARLIESTIMAGE)[0]+".out","w").close()
+        tmp=open(os.path.join(os.path.dirname(EARLIESTIMAGE),"Output_Data",os.path.basename(EARLIESTIMAGE).split(".")[0]+".out"),"w").close()
 
         # Get latest image for thresholding and detecting culture locations
         imN,arrN=openImage(LATESTIMAGE)
@@ -63,7 +74,8 @@ def main(fmt="384"):
 
         for FILENAME in barcdict[BARCODE]:
             im,arr=openImage(FILENAME)
-            arr=arr*correction_map
+            if correction:
+                arr=arr*correction_map
             
             # Correct for lighting differences between plates
             arrsm=arr[numpy.min(locationsN.y):numpy.max(locationsN.y),numpy.min(locationsN.x):numpy.max(locationsN.x)]
@@ -80,12 +92,12 @@ def main(fmt="384"):
             locations=measureSizeAndColour(locationsN,arr,im,mask,average_back,BARCODE,FILENAME[0:-4])
 
             # Write results to file
-            locations.to_csv(os.path.join(outputdata,FILENAME[0:-4]+".out"),"\t",index=False,engine='python')
-            dataf=saveColonyzer(os.path.join(outputdata,FILENAME[0:-4]+".dat"),locations,threshadj,dx,dy)
+            locations.to_csv(os.path.join(os.path.dirname(FILENAME),"Output_Data",os.path.basename(FILENAME).split(".")[0]+".out"),"\t",index=False,engine='python')
+            dataf=saveColonyzer(os.path.join(os.path.dirname(FILENAME),"Output_Data",os.path.basename(FILENAME).split(".")[0]+".dat"),locations,threshadj,dx,dy)
 
             # Visual check of culture locations
             imthresh=threshPreview(arr,threshadj,locations)
-            imthresh.save(os.path.join(outputimages,FILENAME[0:-4]+".png"))
+            imthresh.save(os.path.join(os.path.dirname(FILENAME),"Output_Images",os.path.basename(FILENAME).split(".")[0]+".png"))
 
         # Get ready for next image
         print("Finished: "+FILENAME+" "+str(time.time()-start)+" s")

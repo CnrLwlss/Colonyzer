@@ -10,6 +10,8 @@ def main():
     # First 15 characters in filename identify unique plates
     # Remaining charaters can be used to store date, time etc.
     barcRange=(0,15)
+
+    # Disabling lighting correction
     correction=True
     if len(sys.argv)>1:
         if '--nolc' in sys.argv:
@@ -19,9 +21,15 @@ def main():
     start=time.time()
 
     # Find image files which have yet to be analysed
-    (fullpath,outputimages,outputdata)=setupDirectories()
-    barcdict=getBarcodes(outputimages,outputdata,fullpath,barcRange)
-    InsData=readInstructions(fullpath)
+    barcdict=getBarcodes(os.getcwd(),barcRange)
+    # Setup output directories if not already present
+    rept=setupDirectories(barcdict)
+    if len(rept)>0:
+        print ("Newly created directories:")
+        for line in rept:
+            print rept
+
+    InsData=readInstructions(os.getcwd())
 
     while len(barcdict)>0:
         BARCODE=barcdict.keys()[0]
@@ -31,7 +39,7 @@ def main():
         imRoot=EARLIESTIMAGE.split(".")[0]
         
         # Indicate that barcode is currently being analysed, to allow parallel analysis
-        tmp=open(os.path.join(outputdata,imRoot+".dat"),"w").close()
+        tmp=open(os.path.join(os.path.dirname(EARLIESTIMAGE),"Output_Data",os.path.basename(EARLIESTIMAGE).split(".")[0]+".out"),"w").close()
 
         # Get latest image for thresholding and detecting culture locations
         imN,arrN=openImage(LATESTIMAGE)
@@ -39,11 +47,11 @@ def main():
         im0,arr0=openImage(EARLIESTIMAGE)
 
         # If we have ColonyzerParametryzer output for this filename, use it for initial culture location estimates
-        if LATESTIMAGE in InsData:
-            (candx,candy,dx,dy)=SetUp(InsData[LATESTIMAGE])
+        if os.path.basename(LATESTIMAGE) in InsData:
+            (candx,candy,dx,dy)=SetUp(InsData[os.path.basename(LATESTIMAGE)])
         # If there are multiple calibrations available, choose the best one based on date of image capture
         elif any(isinstance(el, list) for el in InsData['default']):
-            imname=LATESTIMAGE.split(".")[0]
+            imname=os.path.basename(LATESTIMAGE).split(".")[0]
             imdate=imname[-19:-9]
             (candx,candy,dx,dy)=SetUp(InsData['default'],imdate)
         else:
@@ -86,16 +94,19 @@ def main():
             locations=measureSizeAndColour(locationsN,arr,im,mask,average_back,BARCODE,FILENAME[0:-4])
 
             # Write results to file
-            locations.to_csv(os.path.join(outputdata,FILENAME[0:-4]+".out"),"\t",index=False)
-            dataf=saveColonyzer(os.path.join(outputdata,FILENAME[0:-4]+".dat"),locations,threshadj,dx,dy)
+            locations.to_csv(os.path.join(os.path.dirname(FILENAME),"Output_Data",os.path.basename(FILENAME).split(".")[0]+".out"),"\t",index=False,engine='python')
+            dataf=saveColonyzer(os.path.join(os.path.dirname(FILENAME),"Output_Data",os.path.basename(FILENAME).split(".")[0]+".dat"),locations,threshadj,dx,dy)
 
             # Visual check of culture locations
             imthresh=threshPreview(arr,threshadj,locations)
-            imthresh.save(os.path.join(outputimages,FILENAME[0:-4]+".png"))
+            imthresh.save(os.path.join(os.path.dirname(FILENAME),"Output_Images",os.path.basename(FILENAME).split(".")[0]+".png"))
 
         # Get ready for next image
         print("Finished: "+FILENAME+" "+str(time.time()-start)+" s")
-        barcdict=getBarcodes(outputimages,outputdata,fullpath,barcRange)
+        barcdict=getBarcodes(os.getcwd(),barcRange)
+        
+        # Setup output directories if not already present
+        rept=setupDirectories(barcdict)
     print("No more barcodes to analyse... I'm done.")
 
 if __name__ == '__main__':
