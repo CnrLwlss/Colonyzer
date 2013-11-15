@@ -68,12 +68,12 @@ def main():
 
         # Write results to file
         locations.to_csv(os.path.join(os.path.dirname(imName),"Output_Data",os.path.basename(imName).split(".")[0]+".out"),"\t",index=False,engine='python')
-        dataf=saveColonyzer(os.path.join(os.path.dirname(imName),"Output_Data",os.path.basename(imName).split(".")[0]+".dat"),locations,threshadj,dx,dy)
+        dataf=saveColonyzer(os.path.join(os.path.dirname(imName),"Output_Data",os.path.basename(imName).split(".")[0]+".dat"),locations,thresh,dx,dy)
 
         # Visual check of culture locations
         imthresh=threshPreview(arr,thresh,locations)
         #imthresh.show()
-        iimthresh.save(os.path.join(os.path.dirname(imName),"Output_Images",os.path.basename(imName).split(".")[0]+".png"))
+        imthresh.save(os.path.join(os.path.dirname(imName),"Output_Images",os.path.basename(imName).split(".")[0]+".png"))
 
         # Get ready for next image
         print("Finished: "+str(time.time()-start)+" s")
