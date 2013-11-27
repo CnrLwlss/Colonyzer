@@ -629,7 +629,7 @@ def measureSizeAndColour(locations,arr,im,finalmask,average_back,barcode,filenam
     locations=sizeSpots(locations,arr,finalmask,edge,average_back)
     locations=getColours(im,locations,finalmask)
     locations["Barcode"]=barcode
-    locations["Filename"]=filename
+    locations["Filename"]=os.path.basename(filename).split(".")[0]
     return(locations)
 
 def threshPreview(arr,thresh1,locations):

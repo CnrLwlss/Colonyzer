@@ -13,10 +13,15 @@ def main():
 
     # Disabling lighting correction
     correction=True
+    fixedThresh=0
     if len(sys.argv)>1:
         if '--nolc' in sys.argv:
             print "No lighting correction..."
             correction=False
+        if '--fixthresh' in sys.argv:
+            ind=sys.argv.index('--fixthresh')+1
+            fixedThresh=float(sys.argv[ind])
+            print "Using fixed threshold "+str(fixedThresh)
 
     start=time.time()
 
@@ -68,7 +73,10 @@ def main():
 
         # Trim outer part of image to remove plate walls
         trimmed_arr=arrN[max(0,min(locationsN.y)-dy):min(arr0.shape[0],(max(locationsN.y)+dy)),max(0,(min(locationsN.x)-dx)):min(arr0.shape[1],(max(locationsN.x)+dx))]
-        (thresh,bindat)=automaticThreshold(trimmed_arr)
+        if fixedThresh!=0:
+            thresh=fixedThresh
+        else:
+            (thresh,bindat)=automaticThreshold(trimmed_arr)
 
         # Mask for identifying culture areas
         maskN=numpy.ones(arrN.shape,dtype=numpy.bool)
