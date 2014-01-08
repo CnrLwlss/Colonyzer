@@ -13,6 +13,7 @@ def main():
 
     # Disabling lighting correction
     correction=True
+    threshplots=False
     fixedThresh=0
     if len(sys.argv)>1:
         if '--nolc' in sys.argv:
@@ -22,6 +23,9 @@ def main():
             ind=sys.argv.index('--fixthresh')+1
             fixedThresh=float(sys.argv[ind])
             print "Using fixed threshold "+str(fixedThresh)
+        if'--threshplots' in sys.argv:
+            threshplots=True
+            print "Plotting pixel intensity distributions"
 
     start=time.time()
 
@@ -36,12 +40,17 @@ def main():
 
     InsData=readInstructions(os.getcwd())
 
+
     while len(barcdict)>0:
         BARCODE=barcdict.keys()[0]
         print(BARCODE)
         LATESTIMAGE=barcdict[BARCODE][0]
         EARLIESTIMAGE=barcdict[BARCODE][-1]
         imRoot=EARLIESTIMAGE.split(".")[0]
+
+        # Generate pdf report about distributions
+        if threshplots:
+            pdf=PdfPages(BARCODE+'_HistogramReport.pdf')
         
         # Indicate that barcode is currently being analysed, to allow parallel analysis
         tmp=open(os.path.join(os.path.dirname(EARLIESTIMAGE),"Output_Data",os.path.basename(EARLIESTIMAGE).split(".")[0]+".out"),"w").close()
@@ -73,10 +82,17 @@ def main():
 
         # Trim outer part of image to remove plate walls
         trimmed_arr=arrN[max(0,min(locationsN.y)-dy):min(arr0.shape[0],(max(locationsN.y)+dy)),max(0,(min(locationsN.x)-dx)):min(arr0.shape[1],(max(locationsN.x)+dx))]
+        #showIm(trimmed_arr)
         if fixedThresh!=0:
             thresh=fixedThresh
         else:
-            (thresh,bindat)=automaticThreshold(trimmed_arr)
+            if threshplots:
+                (thresh,bindat)=automaticThreshold(trimmed_arr,BARCODE,pdf)
+                plotModel(bindat,label=BARCODE,pdf=pdf)
+            else:
+                (thresh,bindat)=automaticThreshold(trimmed_arr)
+        if threshplots:
+            pdf.close()   
 
         # Mask for identifying culture areas
         maskN=numpy.ones(arrN.shape,dtype=numpy.bool)
@@ -92,8 +108,9 @@ def main():
             masksm=maskN[numpy.min(locationsN.y):numpy.max(locationsN.y),numpy.min(locationsN.x):numpy.max(locationsN.x)]
             meanPx=numpy.mean(arrsm[numpy.logical_not(masksm)])
 
-            arr=arr+(average_back-meanPx)
-            threshadj=thresh+(average_back-meanPx)
+            #arr=arr+(average_back-meanPx)
+            #threshadj=thresh+(average_back-meanPx)
+            threshadj=thresh
 
             mask=numpy.ones(arr.shape,dtype=numpy.bool)
             mask[arrN<threshadj]=False
@@ -115,6 +132,7 @@ def main():
         
         # Setup output directories if not already present
         rept=setupDirectories(barcdict)
+
     print("No more barcodes to analyse... I'm done.")
 
 if __name__ == '__main__':

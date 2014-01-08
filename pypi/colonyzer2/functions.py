@@ -1,5 +1,6 @@
 import numpy,pandas,PIL,math,os,sys, time
 import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
 from PIL import Image, ImageDraw, ImageFont
 from scipy import stats, optimize, ndimage, signal
 import scipy
@@ -267,12 +268,17 @@ def initialGuess(intensities,counts):
     # Order maxima by peak heights
     maxima=maxima[heights.argsort()]
     # Take two biggest peaks as means of two components
-    mu1=maxima[-1]
-    nextbig=maxima[maxima>1.1*mu1]
-    if(len(nextbig)>0):
-        mu2=nextbig[-1]
+    biggest=maxima[-1]
+    dists=numpy.abs(biggest-maxima)
+    nextbig_candidates=maxima[dists>len(intensities)/10.0]
+    #nextbig_candidates=maxima[maxima>1.1*mu1]
+    if(len(nextbig_candidates)>0):
+        nextbig=nextbig_candidates[-1]
     else:
-        mu2=int(round(1.5*mu1))
+        # Assume that single peak dected is agar and second, brighter peak will be cells
+        nextbig=int(round(1.5*biggest))
+    mu1=min(biggest,nextbig)
+    mu2=max(biggest,nextbig)
     
     # Mirror curve from 0...mu1 to estimate distribution of first component
     P1=numpy.zeros(len(intensities),dtype=numpy.int)
@@ -642,13 +648,15 @@ def threshPreview(arr,thresh1,locations):
         draw.rectangle((x-r,y-r,x+r,y+r),outline=colours[i%5])
     return(imthresh)
 
-def automaticThreshold(arr):
+def automaticThreshold(arr,label="",pdf=None):
     '''Choose a threshold for segmenting pixel intensities by fitting two-component Gaussian mixture model'''
     # Initial guess for mixed model parameters for thresholding lighting corrected image
     (counts,intensities)=numpy.histogram(arr,bins=2**8,range=(0,2**8))
     intensities=numpy.array(intensities[0:-1],dtype=numpy.int)
     smoothcounts=ndimage.gaussian_filter1d(counts,1)
     (bindat,[theta,mu1,mu2,sigma1,sigma2])=initialGuess(intensities,smoothcounts)
+    if(pdf!=None):
+        plotGuess(bindat,label,pdf)
 
     # Maximise likelihood of 2-component mixed Gaussian model parameters given binned observations by constrained optimisation
     logL=makeObjective(bindat.intensities,bindat.counts,totFunc)
