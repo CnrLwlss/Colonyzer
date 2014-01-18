@@ -1,4 +1,5 @@
 import numpy,pandas,PIL,math,os,sys, time
+from datetime import datetime
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from PIL import Image, ImageDraw, ImageFont
@@ -540,8 +541,9 @@ def getImageNames(fullpath):
     imList.sort(reverse=True)
     return(imList)
 
-def getBarcodes(fullpath,barcRange=(0,15)):
-    '''Get filenames for all images which have not yet been analysed.'''
+def getBarcodes(fullpath,barcRange=(0,15),checkDone=True):
+    '''Get filenames for all images in current directory and all sub-directories.
+Return a dictionary of filenames, listed by barcode (plate ID)'''
     allfiles=[]
     alldats=[]
     for dirname, dirnames, filenames in os.walk(fullpath):
@@ -552,9 +554,11 @@ def getBarcodes(fullpath,barcRange=(0,15)):
                 elif filename[-4:] == '.out':
                     alldats.append(os.path.join(dirname, filename))
     imsDone=list(numpy.unique([os.path.basename(dat).split(".")[0] for dat in alldats]))
-    barcsDone=list(numpy.unique([os.path.basename(dat)[barcRange[0]:barcRange[1]] for dat in alldats]))
+    if checkDone:
+        barcsDone=list(numpy.unique([os.path.basename(dat)[barcRange[0]:barcRange[1]] for dat in alldats]))
+    else:
+        barcsDone=[]
     barcdict={}
-    imList=[]
     for filename in allfiles:
         fname=os.path.basename(filename)
         barc=fname[barcRange[0]:barcRange[1]]
@@ -563,9 +567,10 @@ def getBarcodes(fullpath,barcRange=(0,15)):
                 barcdict[barc]=[filename]
             else:
                 barcdict[barc].append(filename)
-    imList.sort(reverse=True)
     for b in barcdict:
-        barcdict[b].sort(reverse=True)
+        fnames=numpy.array([os.path.basename(x) for x in barcdict[b]])
+        barcdict[b]=list(numpy.array(barcdict[b])[fnames.argsort()])[::-1]
+        #barcdict[b].sort(reverse=True)
     return(barcdict)
 
 def openImage(imName):
@@ -677,3 +682,244 @@ def automaticThreshold(arr,label="",pdf=None):
     bindat["gauss1"]=numpy.array([theta_opt*stats.norm.pdf(x,mu1_opt,sigma1_opt) for x in bindat.intensities],dtype=numpy.float)
     bindat["gauss2"]=numpy.array([(1.0-theta_opt)*stats.norm.pdf(x,mu2_opt,sigma2_opt) for x in bindat.intensities],dtype=numpy.float)
     return((thresh1,bindat))
+
+def pad(x,zeros=2):
+    '''Pads an integer to a two-character string with leading zero or just return string'''
+    try:
+        return(("%0"+str(zeros)+"d")%x)
+    except:
+        if x!=x: # Check for nan
+            x="missing"
+        return(x)
+
+def viewerSummary(res):
+    '''Generate report to help building vertical and horizontal categories for image viewer'''
+    # Tidy up columns (maybe add these lines to a read-in-data function instead?)
+    if "Treatments" in res.columns:
+        res.rename(columns={"Treatments":"Treatment","X.Offset":"XOffset","Y.Offset":"YOffset","Tile.Dimensions.X":"TileX","Tile.Dimensions.Y":"TileY"},inplace=True)
+    res["TreatMed"]=res["Treatment"].map(str)+"_"+res["Medium"].map(str)
+    res=res.dropna(axis=0,how="all")
+    res=res[pandas.notnull(res["Treatment"])]
+    
+    print "Data summary"
+    print "~~~~~~~~~~~~"
+    print "Barcode: "+str(len(res["Barcode"].unique()))
+    print "Library Plates: "+str(len(res["MasterPlate.Number"].unique()))
+    print "SGA replicate plates: "+str(len(res["RepQuad"].unique()))
+    print "Screen identifiers: "+str(len(res["Screen.Name"].unique()))+"("+",".join([str(x) for x in res["Screen.Name"].unique()])+")"
+    if "ScreenID" in res.columns:
+        print "Screen IDs: "+str(len(res["ScreenID"].unique()))+"("+",".join([str(x) for x in res["ScreenID"].unique()])+")"
+    print "Libraries: "+str(len(res["Library.Name"].unique()))+"("+",".join([str(x) for x in res["Library.Name"].unique()])+")"
+    print "Treatment: "+str(len(res["Treatment"].unique()))+"("+",".join([str(x) for x in res["Treatment"].unique()])+")"
+    print "Medium: "+str(len(res["Medium"].unique()))+"("+",".join([str(x) for x in res["Medium"].unique()])+")"
+    print "TreatMed: "+str(len(res["TreatMed"].unique()))+"("+",".join([str(x) for x in res["TreatMed"].unique()])+")"
+    print ""
+
+def getNearest(barcs,exptTime=1.0):
+    '''Find one image whose time captured is closest to exptTime for all barcodes in a dictionary of file paths (barcs)'''
+    closestImage={}
+    for b in barcs:
+        dates=[datetime.strptime(x.split(".")[0][-19:],"%Y-%m-%d_%H-%M-%S") for x in barcs[b]]
+        first=min(dates)
+        datediffs=[date-first for date in dates]
+        diffs=[(x.total_seconds()/(60*60*24.0))-exptTime for x in datediffs]
+        absdiffs=[abs(diff) for diff in diffs]
+        bestind=numpy.argmin(absdiffs)
+        closestImage[b]=barcs[b][bestind]
+    return(closestImage)
+
+def makeHoriz(res,horizontal):
+    '''Make a list of horizontal identifiers based on the "horizontal" column in the data frame res'''
+    horiz=res[horizontal].unique()
+    horiz=[x for x in horiz if x==x] # Get rid of nans
+    return(horiz)
+    
+def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600,highlight={}):
+    '''Make a html preview of images listed in res, columns by "horizonal", filename htmlroot, report title, genes to highlight colour:list.'''
+    # List of possible identifiers, by which experiment can be separated
+    # If we need to sort final image differently, sort this list appropriately
+    All_IDs=["MasterPlate.Number","RepQuad","Screen.Name","Library.Name","Treatment","Medium"]
+    horiz=makeHoriz(res,horizontal)
+    # Build an ID which doesn't include the horizontal identifier
+    # or any identifier which is effectively the same as the horizontal identifier
+    IDs=[x for x in All_IDs if x != horizontal and len((res[x].map(pad)+res[horizontal].map(pad)).unique())>len(horiz)]
+    res["vertID"]=""
+    for i in range(0,len(IDs)):
+        res["vertID"]=res["vertID"]+res[IDs[i]].map(pad)+"_"
+
+    # Construct a replicate ID
+    # Split data by horizontal
+    hSplit=[res[res[horizontal]==x] for x in horiz]
+    for h in hSplit:
+        repNo=0
+        h["Replicate"]=repNo
+        h.sort("Barcode",inplace=True)
+        for i in xrange(1,h.shape[0]):
+            if (h["Barcode"].iloc[i]!=h["Barcode"].iloc[i-1]) and (h["vertID"].iloc[i]==h["vertID"].iloc[i-1]):
+                repNo+=1
+            if (h["Barcode"].iloc[i]!=h["Barcode"].iloc[i-1]) and (h["vertID"].iloc[i]!=h["vertID"].iloc[i-1]):
+                repNo=0
+            h["Replicate"].iloc[i]=repNo
+        h["vertID"]=h["vertID"]+h["Replicate"].map(pad)
+        h.sort("vertID",inplace=True)
+    res=hSplit[0]
+    if len(hSplit)>1:
+        for i in xrange(1,len(hSplit)):
+            res=res.append(hSplit[i])
+
+    All_IDs.append("Replicate")
+
+    # We need to construct an identifier that is common to all elements of horizontal
+    # but will be different for all rows.  Tricky part is if some elements of horizontal have
+    # fewer rows than other (e.g. technical replicates for one expt., but not another)...
+
+    # First, eliminate identifiers that are common to all plates in res
+    diffIDs=[x for x in All_IDs if len(res[x].unique())>1 and x not in horizontal and len((res[x].map(pad)+res[horizontal].map(pad)).unique())>len(horiz)]
+    res["vID"]=""
+    for i in range(0,len(diffIDs)):
+        res["vID"]=res["vID"]+res[diffIDs[i]].map(pad)+"#"
+
+    horiz=makeHoriz(res,horizontal)
+    imList=[res[res[horizontal]==x] for x in horiz]
+    vIDlist=res["vID"].unique()
+    # For the moment, assume that all images have the same aspect ratio
+    allBarcs=[]
+    for im in imList:
+        for b in im["Barcode"].unique():
+            allBarcs.append(b)
+
+    exampleFName=closestImage[allBarcs[0]]
+    exampleIm=Image.open(exampleFName)
+    (imw,imh)=exampleIm.size
+
+    smh=int(round(float(imh)*float(smw)/float(imw)))
+
+    # Scale factors for coordinates of preview images
+    scalex=(float(smw)/float(imw))
+    scaley=(float(smh)/float(imh))
+
+    W=len(horiz)
+    H=len(vIDlist)
+
+    # Prepare blank slates for large preview images
+    plateArr=Image.new('RGB',(scl*smw*W,scl*smh*H),color=0)
+    plateOver=Image.new('RGBA',(scl*smw*W,scl*smh*H),color=0)
+
+    draw = ImageDraw.Draw(plateOver)
+
+    # Row and column counters for preview images
+    xblank=0
+    yblank=0
+
+    # Start creating html files for building the image maps
+    SGAString="""<!doctype html>
+    <html lang=en> 
+    <head>
+    <meta charset=utf-8>
+    <title>QFA image browser generated by Colonyzer</title>
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800' rel='stylesheet' type='text/css'>
+    <style type="text/css">
+    img {
+        position:absolute;
+        top: 250px;
+        left: 0px;
+        border: 0;
+            }
+    body{
+            font-family: 'Open Sans', sans-serif;
+            font-size: 1.5em;
+    }
+
+    h2 {
+            margin: 0px;
+            padding: 0px;
+            color: black;
+            font-size: 2.5em;
+            font-weight: 600;
+            }
+
+    h3 {
+            margin: 0px;
+            padding: 0px;
+            color: black;
+            font-size: 1.5em;
+            font-weight: 500;
+            }
+
+    a:link {	
+                    color: black;
+                    font-weight: 700; 
+                    text-decoration: none;
+            }
+
+    a:visited {	color: black;
+                    font-weight: 700; 
+                    text-decoration: none;
+                    border-bottom:0px dashed
+            }
+
+    a:hover{background: black;
+                    color: white;
+                    font-weight: 700;
+    }
+    </style>
+
+    </head>
+
+    <base target='_blank' />
+
+    <body>
+    <img src="%s.jpeg" title="Plate image array" width="%s"/>
+    <img src="%s_OVERLAY.gif" usemap="#ImageMap" width="%s"/>
+    """%(htmlroot,str(smw*W),htmlroot,str(smw*W))
+
+    for colour in highlight:
+        highlight[colour]=[x.upper() for x in highlight[colour]]
+
+    font = ImageFont.truetype("arial.ttf", 25*scl)
+    mapString='''
+    <map name="ImageMap">
+    '''
+    for col,colDat in enumerate(imList):
+        for row,vID in enumerate(vIDlist):
+            dat=colDat[colDat["vID"]==vID]
+            if dat.shape[0]>0:
+                barc=dat["Barcode"].iloc[0]
+                im=Image.open(closestImage[barc]).resize((scl*smw,scl*smh),Image.ANTIALIAS)
+                plateArr.paste(im,(col*smw*scl,row*smh*scl))
+                dat=res[res["Barcode"]==barc]
+                dat["tlx"]=col*smw+scalex*dat["XOffset"]
+                dat["tly"]=row*smh+scaley*dat["YOffset"]
+                dat["brx"]=dat["tlx"]+scalex*dat["TileX"]
+                dat["bry"]=dat["tly"]+scaley*dat["TileY"]
+                for ind,dRow in dat.iterrows():
+                    inputs=(int(round(dRow["tlx"])),int(round(dRow["tly"])),int(round(dRow["brx"])),int(round(dRow["bry"])),dRow["Gene"],dRow["ORF"])
+                    mapString+='<area shape="rect" coords="%i,%i,%i,%i" title="%s" href="http://www.yeastgenome.org/cgi-bin/locus.fpl?locus=%s" alt=""/>\n'%inputs
+                    for colour in highlight:
+                        if dRow["Gene"].upper() in highlight[colour]:
+                            for d in xrange(0,3):
+                                draw.rectangle((int(round(dRow["tlx"]))*scl-d,int(round(dRow["tly"]))*scl-d,int(round(dRow["brx"]))*scl+d,int(round(dRow["bry"]))*scl+d),outline=colour)
+                
+                inputs=(col*smw,row*smh,(col+1)*smw,(row+1)*smh,str(horiz[col])+"#"+str(dat["vID"].iloc[0])+str(dat["Barcode"].iloc[0]))
+                mapString+='<area shape="rect" coords="%i,%i,%i,%i" title="%s"/>\n'%inputs
+                # Text indicating plate numbers
+                draw.text((col*smw*scl, smh*scl*(row+1)-25*scl), "P"+pad(dat["MasterPlate.Number"].iloc[0]),fill="yellow",font=font)
+
+    KeyString='''
+    <h2>%s</h2>
+    <h3><a href="http://research.ncl.ac.uk/qfa/">QFA</a> image browser tool, generated by <a href="http://research.ncl.ac.uk/colonyzer/">Colonyzer</a></h3>
+    <p><i>Plate hover key:</i> %s</p>
+    '''%(str(title),horizontal+"#"+"#".join(diffIDs)+"#Barcode")
+    for col,h in enumerate(horiz):
+        KeyString+='''<div style="position:absolute; top: 210px; left: %ipx;">%s</div>
+'''%(smw*col,str(h))
+    
+    plateArr.save(htmlroot+'.jpeg',quality=100)
+    plateOver.save(htmlroot+'_OVERLAY.gif',transparency=0)
+    fout=open(htmlroot+'.html','w')
+    fout.write(SGAString+KeyString+mapString+"</map></body></html>")
+    fout.close()
+
+    fout=open(htmlroot+'_NOMAP.html','w')
+    fout.write(SGAString+KeyString+"</body></html>")
+    fout.close()
