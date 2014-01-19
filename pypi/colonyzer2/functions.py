@@ -683,6 +683,17 @@ def automaticThreshold(arr,label="",pdf=None):
     bindat["gauss2"]=numpy.array([(1.0-theta_opt)*stats.norm.pdf(x,mu2_opt,sigma2_opt) for x in bindat.intensities],dtype=numpy.float)
     return((thresh1,bindat))
 
+def openQFA(fname):
+    '''Reads tab-delimited QFA data, processes it and returns dataframe'''
+    res=pandas.read_csv(fname,sep="\t")
+    # Tidy up columns (maybe add these lines to a read-in-data function instead?)
+    if "Treatments" in res.columns:
+        res.rename(columns={"Treatments":"Treatment","X.Offset":"XOffset","Y.Offset":"YOffset","Tile.Dimensions.X":"TileX","Tile.Dimensions.Y":"TileY"},inplace=True)
+    res["TreatMed"]=res["Treatment"].map(str)+"_"+res["Medium"].map(str)
+    res=res.dropna(axis=0,how="all")
+    res=res[pandas.notnull(res["Treatment"])]
+    return(res)
+
 def pad(x,zeros=2):
     '''Pads an integer to a two-character string with leading zero or just return string'''
     try:
@@ -693,14 +704,7 @@ def pad(x,zeros=2):
         return(x)
 
 def viewerSummary(res):
-    '''Generate report to help building vertical and horizontal categories for image viewer'''
-    # Tidy up columns (maybe add these lines to a read-in-data function instead?)
-    if "Treatments" in res.columns:
-        res.rename(columns={"Treatments":"Treatment","X.Offset":"XOffset","Y.Offset":"YOffset","Tile.Dimensions.X":"TileX","Tile.Dimensions.Y":"TileY"},inplace=True)
-    res["TreatMed"]=res["Treatment"].map(str)+"_"+res["Medium"].map(str)
-    res=res.dropna(axis=0,how="all")
-    res=res[pandas.notnull(res["Treatment"])]
-    
+    '''Generate report to help building vertical and horizontal categories for image viewer'''   
     print "Data summary"
     print "~~~~~~~~~~~~"
     print "Barcode: "+str(len(res["Barcode"].unique()))
