@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 setup(name='Colonyzer2',
-      version='1.0.67',
+      version='1.0.68',
       packages=['colonyzer2'],
       description='Image analysis for microbial cultures growing on solid agar surfaces',
       long_description=open('README.txt').read(),

@@ -1,4 +1,4 @@
-import numpy,pandas,PIL,math,os,sys, time
+import numpy,pandas,PIL,math,os,sys,time,platform
 from datetime import datetime
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
@@ -723,7 +723,7 @@ def getNearest(barcs,exptTime=1.0):
     '''Find one image whose time captured is closest to exptTime for all barcodes in a dictionary of file paths (barcs)'''
     closestImage={}
     for b in barcs:
-        dates=[datetime.strptime(x.split(".")[0][-19:],"%Y-%m-%d_%H-%M-%S") for x in barcs[b]]
+        dates=[datetime.strptime(x.split(".")[-2][-19:],"%Y-%m-%d_%H-%M-%S") for x in barcs[b]]
         first=min(dates)
         datediffs=[date-first for date in dates]
         diffs=[(x.total_seconds()/(60*60*24.0))-exptTime for x in datediffs]
@@ -880,7 +880,16 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
     for colour in highlight:
         highlight[colour]=[x.upper() for x in highlight[colour]]
 
-    font = ImageFont.truetype("arial.ttf", 25*scl)
+    # Font definition is annoyingly platform-dependent
+    # http://www.razorvine.net/blog/user/irmen/article/2008-08-02/127
+    for path in ["arial.ttf", "/System/Library/Fonts/Helvetica.dfont",
+        "/Library/Fonts/Arial.ttf", "c:/windows/fonts/arial.ttf",
+	"/usr/share/fonts/truetype/ttf-dejavu/DejaVuSans.ttf" ]:
+        try:
+            font = ImageFont.truetype(path, 25*scl)
+        except:
+            pass
+
     mapString='''
     <map name="ImageMap">
     '''
