@@ -738,10 +738,15 @@ def makeHoriz(res,horizontal):
     horiz=[x for x in horiz if x==x] # Get rid of nans
     return(horiz)
     
-def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600,highlight={}):
+def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600,highlight={},hitPercentile=100, deadPercentile=-99):
     '''Make a html preview of images listed in res, columns by "horizonal", filename htmlroot, report title, genes to highlight colour:list.'''
     # List of possible identifiers, by which experiment can be separated
     # If we need to sort final image differently, sort this list appropriately
+    hitThresh=numpy.percentile(res["fit"],hitPercentile)
+    if deadPercentile>=0.0:
+        deadThresh=numpy.percentile(res["fit"],deadPercentile)
+    else:
+        deadThresh=-9999999999
     All_IDs=["MasterPlate.Number","RepQuad","Screen.Name","Library.Name","Treatment","Medium"]
     horiz=makeHoriz(res,horizontal)
     # Build an ID which doesn't include the horizontal identifier
@@ -806,8 +811,8 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
     H=len(vIDlist)
 
     # Prepare blank slates for large preview images
-    plateArr=Image.new('RGB',(scl*smw*W,scl*smh*H),color=0)
-    plateOver=Image.new('RGBA',(scl*smw*W,scl*smh*H),color=0)
+    plateArr=Image.new('RGB',(int(round(scl*smw*W)),int(round(scl*smh*H))),color=0)
+    plateOver=Image.new('RGBA',(int(round(scl*smw*W)),int(round(scl*smh*H))),color=0)
 
     draw = ImageDraw.Draw(plateOver)
 
@@ -886,20 +891,19 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
         "/Library/Fonts/Arial.ttf", "c:/windows/fonts/arial.ttf",
 	"/usr/share/fonts/truetype/ttf-dejavu/DejaVuSans.ttf" ]:
         try:
-            font = ImageFont.truetype(path, 25*scl)
+            font = ImageFont.truetype(path, int(round(25*scl)))
         except:
             pass
 
-    mapString='''
-    <map name="ImageMap">
-    '''
+    mapString=''''''
+    plateString=''''''
     for col,colDat in enumerate(imList):
         for row,vID in enumerate(vIDlist):
             dat=colDat[colDat["vID"]==vID]
             if dat.shape[0]>0:
                 barc=dat["Barcode"].iloc[0]
-                im=Image.open(closestImage[barc]).resize((scl*smw,scl*smh),Image.ANTIALIAS)
-                plateArr.paste(im,(col*smw*scl,row*smh*scl))
+                im=Image.open(closestImage[barc]).resize((int(round(scl*smw)),int(round(scl*smh))),Image.ANTIALIAS)
+                plateArr.paste(im,(int(round(col*smw*scl)),int(round(row*smh*scl))))
                 dat=res[res["Barcode"]==barc]
                 dat["tlx"]=col*smw+scalex*dat["XOffset"]
                 dat["tly"]=row*smh+scaley*dat["YOffset"]
@@ -908,15 +912,23 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
                 for ind,dRow in dat.iterrows():
                     inputs=(int(round(dRow["tlx"])),int(round(dRow["tly"])),int(round(dRow["brx"])),int(round(dRow["bry"])),dRow["Gene"],dRow["ORF"])
                     mapString+='<area shape="rect" coords="%i,%i,%i,%i" title="%s" href="http://www.yeastgenome.org/cgi-bin/locus.fpl?locus=%s" alt=""/>\n'%inputs
+                    if dRow["fit"]>hitThresh:
+                            for d in xrange(0,1):
+                                draw.rectangle((int(round(dRow["tlx"]*scl))-d,int(round(dRow["tly"]*scl))-d,int(round(dRow["brx"]*scl))+d,int(round(dRow["bry"]*scl))+d),outline="white")
+                    if dRow["fit"]<deadThresh:
+                            cx=int(round((dRow["tlx"]+dRow["brx"])*scl/2.0))
+                            cy=int(round((dRow["tly"]+dRow["bry"])*scl/2.0))
+                            r=1
+                            draw.rectangle((cx-r,cy-r,cx+r,cy+r),fill="white")
                     for colour in highlight:
                         if dRow["Gene"].upper() in highlight[colour]:
                             for d in xrange(0,3):
-                                draw.rectangle((int(round(dRow["tlx"]))*scl-d,int(round(dRow["tly"]))*scl-d,int(round(dRow["brx"]))*scl+d,int(round(dRow["bry"]))*scl+d),outline=colour)
-                
+                                draw.rectangle((int(round(dRow["tlx"]*scl))-d,int(round(dRow["tly"]*scl))-d,int(round(dRow["brx"]*scl))+d,int(round(dRow["bry"]*scl))+d),outline=colour)
+                                
                 inputs=(col*smw,row*smh,(col+1)*smw,(row+1)*smh,str(horiz[col])+"#"+str(dat["vID"].iloc[0])+str(dat["Barcode"].iloc[0]))
-                mapString+='<area shape="rect" coords="%i,%i,%i,%i" title="%s"/>\n'%inputs
+                plateString+='<area shape="rect" coords="%i,%i,%i,%i" title="%s"/>\n'%inputs
                 # Text indicating plate numbers
-                draw.text((col*smw*scl, smh*scl*(row+1)-25*scl), "P"+pad(dat["MasterPlate.Number"].iloc[0]),fill="yellow",font=font)
+                draw.text((int(round(col*smw*scl)), int(round(smh*scl*(row+1)-25*scl))), "P"+pad(dat["MasterPlate.Number"].iloc[0]),fill="yellow",font=font)
 
     KeyString='''
     <h2>%s</h2>
@@ -930,9 +942,9 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
     plateArr.save(htmlroot+'.jpeg',quality=100)
     plateOver.save(htmlroot+'_OVERLAY.gif',transparency=0)
     fout=open(htmlroot+'.html','w')
-    fout.write(SGAString+KeyString+mapString+"</map></body></html>")
+    fout.write(SGAString+KeyString+'<map name="ImageMap">'+mapString+plateString+"</map></body></html>")
     fout.close()
 
     fout=open(htmlroot+'_NOMAP.html','w')
-    fout.write(SGAString+KeyString+"</body></html>")
+    fout.write(SGAString+KeyString+'<map name="ImageMap">'+plateString+"</map></body></html>")
     fout.close()
