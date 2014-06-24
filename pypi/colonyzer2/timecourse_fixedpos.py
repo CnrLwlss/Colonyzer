@@ -75,7 +75,7 @@ def main():
         locationsN=locateCultures(candx,candy,dx,dy,arrN)
 
         # Smooth (pseudo-)empty image 
-        (correction_map,average_back)=makeCorrectionMap(arr0,locationsN)
+        (correction_map,average_back)=makeCorrectionMap(arr0,locationsN,printMess=correction)
 
         # Correct spatial gradient in final image
         corrected_arrN=arrN*correction_map

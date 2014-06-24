@@ -212,6 +212,10 @@ def estimateLocations(arr,nx,ny,diam=20,showPlt=True,pdfPlt=False):
         vary.append(varpos+symmpen)
     candx=maxx[numpy.argmin(varx):(numpy.argmin(varx)+nx)]
     candy=maxy[numpy.argmin(vary):(numpy.argmin(vary)+ny)]
+    # Update spot sizes based on grid location estimates
+    dx=int(numpy.round(numpy.mean(numpy.diff(candx))))
+    dy=int(numpy.round(numpy.mean(numpy.diff(candy))))
+    
     # Output some plots
     if showPlt:
         plt.plot(sumx)
@@ -573,6 +577,20 @@ Return a dictionary of filenames, listed by barcode (plate ID)'''
         #barcdict[b].sort(reverse=True)
     return(barcdict)
 
+def merge_dols(dol1, dol2):
+    '''Merge two dictionaries of lists'''
+    # http://stackoverflow.com/questions/1495510/combining-dictionaries-of-lists-in-python
+    keys = set(dol1).union(dol2)
+    no = []
+    return dict((k, dol1.get(k, no) + dol2.get(k, no)) for k in keys)
+
+def merge_lodols(dolList):
+    '''Merge a list of dictionaries of lists'''
+    tmp={}
+    for dol in dolList:
+        tmp=merge_dols(tmp,dol)
+    return(tmp)
+
 def openImage(imName):
     '''Open an image, strip alpha channel, convert to array of floats.'''
     im=Image.open(imName)
@@ -626,12 +644,13 @@ def makeMask(arrN,thresh1,tol=5):
             cutout_arr[y_list[i],x_list[i]]=stats.nanmean(plist)
     return (finalMask,cutout_arr)
 
-def makeCorrectionMap(arr0,locations,smoothfactor=250):
+def makeCorrectionMap(arr0,locations,smoothfactor=250,printMess=True):
     '''Smooth a (pseudo-)empty plate image to generate a correction map.'''
     smoothed_arr=ndimage.gaussian_filter(arr0,arr0.shape[1]/smoothfactor)
     average_back=numpy.mean(smoothed_arr[numpy.min(locations.y):numpy.max(locations.y),numpy.min(locations.x):numpy.max(locations.x)])
     correction_map=average_back/smoothed_arr
-    print("Lighting correction map constructed")
+    if printMess:
+        print("Lighting correction map constructed")
     return(correction_map,average_back)
 
 def measureSizeAndColour(locations,arr,im,finalmask,average_back,barcode,filename):
@@ -719,11 +738,18 @@ def viewerSummary(res):
     print "TreatMed: "+str(len(res["TreatMed"].unique()))+"("+",".join([str(x) for x in res["TreatMed"].unique()])+")"
     print ""
 
+def getDate(x,fmt="%Y-%m-%d_%H-%M-%S"):
+    try:
+        dt=datetime.strptime(x.split(".")[-2][-19:],fmt)
+    except:
+        dt=datetime(9999,1,1)
+    return(dt)    
+
 def getNearest(barcs,exptTime=1.0):
     '''Find one image whose time captured is closest to exptTime for all barcodes in a dictionary of file paths (barcs)'''
     closestImage={}
     for b in barcs:
-        dates=[datetime.strptime(x.split(".")[-2][-19:],"%Y-%m-%d_%H-%M-%S") for x in barcs[b]]
+        dates=[getDate(x) for x in barcs[b]]
         first=min(dates)
         datediffs=[date-first for date in dates]
         diffs=[(x.total_seconds()/(60*60*24.0))-exptTime for x in datediffs]
@@ -738,7 +764,7 @@ def makeHoriz(res,horizontal):
     horiz=[x for x in horiz if x==x] # Get rid of nans
     return(horiz)
     
-def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600,highlight={},hitPercentile=100, deadPercentile=-99):
+def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600,highlight={},hitPercentile=100, deadPercentile=-99,outPath="."):
     '''Make a html preview of images listed in res, columns by "horizonal", filename htmlroot, report title, genes to highlight colour:list.'''
     # List of possible identifiers, by which experiment can be separated
     # If we need to sort final image differently, sort this list appropriately
@@ -747,7 +773,7 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
         deadThresh=numpy.percentile(res["fit"],deadPercentile)
     else:
         deadThresh=-9999999999
-    All_IDs=["MasterPlate.Number","RepQuad","Screen.Name","Library.Name","Treatment","Medium"]
+    All_IDs=["MasterPlate.Number","RepQuad","Screen.Name","Condition","Library.Name","Treatment","Medium","Inoc"]
     horiz=makeHoriz(res,horizontal)
     # Build an ID which doesn't include the horizontal identifier
     # or any identifier which is effectively the same as the horizontal identifier
@@ -756,6 +782,10 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
     for i in range(0,len(IDs)):
         res["vertID"]=res["vertID"]+res[IDs[i]].map(pad)+"_"
 
+    # Use Screen.Name as title if none provided
+    if title=="":
+        title=res["Screen.Name"][0]
+        
     # Construct a replicate ID
     # Split data by horizontal
     hSplit=[res[res[horizontal]==x] for x in horiz]
@@ -791,6 +821,7 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
     horiz=makeHoriz(res,horizontal)
     imList=[res[res[horizontal]==x] for x in horiz]
     vIDlist=res["vID"].unique()
+    vIDlist.sort()
     # For the moment, assume that all images have the same aspect ratio
     allBarcs=[]
     for im in imList:
@@ -921,7 +952,7 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
                             r=1
                             draw.rectangle((cx-r,cy-r,cx+r,cy+r),fill="white")
                     for colour in highlight:
-                        if dRow["Gene"].upper() in highlight[colour]:
+                        if str(dRow["Gene"]).upper() in highlight[colour]:
                             for d in xrange(0,3):
                                 draw.rectangle((int(round(dRow["tlx"]*scl))-d,int(round(dRow["tly"]*scl))-d,int(round(dRow["brx"]*scl))+d,int(round(dRow["bry"]*scl))+d),outline=colour)
                                 
@@ -936,15 +967,15 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
     <p><i>Plate hover key:</i> %s</p>
     '''%(str(title),horizontal+"#"+"#".join(diffIDs)+"#Barcode")
     for col,h in enumerate(horiz):
-        KeyString+='''<div style="position:absolute; top: 210px; left: %ipx;">%s</div>
-'''%(smw*col,str(h))
+        KeyString+='''<div style="position:absolute; top: 210px; left: %ipx; width: %ipx;">%s</div>
+'''%(smw*col,smw,str(h))
     
-    plateArr.save(htmlroot+'.jpeg',quality=100)
-    plateOver.save(htmlroot+'_OVERLAY.gif',transparency=0)
-    fout=open(htmlroot+'.html','w')
+    plateArr.save(os.path.join(outPath,htmlroot+'.jpeg'),quality=100)
+    plateOver.save(os.path.join(outPath,htmlroot+'_OVERLAY.gif'),transparency=0)
+    fout=open(os.path.join(outPath,htmlroot+'.html'),'w')
     fout.write(SGAString+KeyString+'<map name="ImageMap">'+mapString+plateString+"</map></body></html>")
     fout.close()
 
-    fout=open(htmlroot+'_NOMAP.html','w')
+    fout=open(os.path.join(outPath,htmlroot+'_NOMAP.html'),'w')
     fout.write(SGAString+KeyString+'<map name="ImageMap">'+plateString+"</map></body></html>")
     fout.close()

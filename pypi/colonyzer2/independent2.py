@@ -58,7 +58,7 @@ while len(imList)>0:
     print("correction map")
     # Smooth (pseudo-)empty image 
     arr=numpy.copy(arrM)
-    (correction_map,average_back)=makeCorrectionMap(arrM,locations)
+    (correction_map,average_back)=makeCorrectionMap(arrM,locations,printMess=correction)
 
     # Correct spatial gradient
     if correction:

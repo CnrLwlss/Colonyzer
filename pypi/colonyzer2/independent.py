@@ -13,12 +13,21 @@ def main():
     # Setup output directories if not already present
     rept=setupDirectories(imList)
 
-    # Disabling lighting correction
+    # Disabling lighting correction etc.
     correction=True
+    threshplots=False
+    fixedThresh=0
     if len(sys.argv)>1:
         if '--nolc' in sys.argv:
             print "No lighting correction..."
             correction=False
+        if '--fixthresh' in sys.argv:
+            ind=sys.argv.index('--fixthresh')+1
+            fixedThresh=float(sys.argv[ind])
+            print "Using fixed threshold "+str(fixedThresh)
+        if'--threshplots' in sys.argv:
+            threshplots=True
+            print "Plotting pixel intensity distributions"
 
     while len(imList)>0:
         imName=imList[0]
@@ -50,15 +59,24 @@ def main():
 
         # Trim outer part of image to remove plate walls
         trimmed_arr=arrN[max(0,min(locations.y)-dy):min(arrN.shape[0],(max(locations.y)+dy)),max(0,(min(locations.x)-dx)):min(arrN.shape[1],(max(locations.x)+dx))]
-        (thresh,bindat)=automaticThreshold(trimmed_arr)
-
+	if fixedThresh!=0:
+            thresh=fixedThresh
+        else:
+            if threshplots:
+                (thresh,bindat)=automaticThreshold(trimmed_arr,BARCODE,pdf)
+                plotModel(bindat,label=BARCODE,pdf=pdf)
+            else:
+                (thresh,bindat)=automaticThreshold(trimmed_arr)
+        if threshplots:
+            pdf.close()   
+			
         print("Markov")
         # Cutout thresholded pixels and fill with Markov field
         (finalMask,arrM)=makeMask(arrN,thresh,9999999999)   
         print("correction map")
         # Smooth (pseudo-)empty image 
         arr=numpy.copy(arrM)
-        (correction_map,average_back)=makeCorrectionMap(arrM,locations)
+        (correction_map,average_back)=makeCorrectionMap(arrM,locations,printMess=correction)
 
         # Correct spatial gradient
         if correction:
