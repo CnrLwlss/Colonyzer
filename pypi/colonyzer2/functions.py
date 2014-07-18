@@ -178,6 +178,8 @@ def autocor(x):
 def showIm(arr,returnIm=False):
     '''Quick 8-bit preview images from float arrays, useful for debugging'''
     imarr=numpy.array(arr,dtype=numpy.uint8)
+    if(arr.dtype=="bool"):
+        imarr=imarr*255
     imnew=Image.fromarray(imarr,"L")
     if returnIm:
         return(imnew)
@@ -625,6 +627,11 @@ def makeMask(arrN,thresh1,tol=5):
     # Save final mask for cutting out all cell signal from earlier images
     finalMask=numpy.ones(arrN.shape,dtype=numpy.bool)
     finalMask[arrN<thresh1]=False
+    cutout_arr=maskAndFill(arrN,finalMask,tol)
+    return (finalMask,cutout_arr)
+
+def maskAndFill(arrN,finalMask,tol=5):
+    '''Cut out masked pixels from image and re-fill using a Markov field update.'''
     # Unmask edges to allow Markov field update
     finalMask[0,:]=False
     finalMask[-1,:]=False
@@ -635,15 +642,19 @@ def makeMask(arrN,thresh1,tol=5):
     old=numpy.zeros(cutout_arr.shape,dtype=float)
     
     (y_list,x_list)=numpy.where(finalMask)
+    print("Filling in gaps")
     while numpy.sum(numpy.abs(old-cutout_arr))/numpy.sum(finalMask)>tol or numpy.isnan(numpy.sum(numpy.abs(old-cutout_arr))/numpy.sum(finalMask)):
+        # Invert filling order at every pass to minimise bias towards a particular direction
+        x_list=x_list[::-1]
+        y_list=y_list[::-1]
         print numpy.sum(numpy.abs(old-cutout_arr))/numpy.sum(finalMask)>tol, numpy.isnan(numpy.sum(numpy.abs(old-cutout_arr))/numpy.sum(finalMask))
         old=numpy.copy(cutout_arr)
         # Markov field update
         for i in xrange(0,len(x_list)):
             plist=[cutout_arr[y_list[i],x_list[i]+1],cutout_arr[y_list[i]+1,x_list[i]],cutout_arr[y_list[i],x_list[i]-1],cutout_arr[y_list[i]-1,x_list[i]]]
             cutout_arr[y_list[i],x_list[i]]=stats.nanmean(plist)
-    return (finalMask,cutout_arr)
-
+    return(cutout_arr)
+    
 def makeCorrectionMap(arr0,locations,smoothfactor=250,printMess=True):
     '''Smooth a (pseudo-)empty plate image to generate a correction map.'''
     smoothed_arr=ndimage.gaussian_filter(arr0,arr0.shape[1]/smoothfactor)
