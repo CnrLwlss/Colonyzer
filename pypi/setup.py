@@ -1,4 +1,5 @@
 from setuptools import setup, find_packages
+from Cython.Build import cythonize
 setup(name='Colonyzer2',
       version='1.0.80',
       packages=['colonyzer2'],
@@ -15,5 +16,6 @@ setup(name='Colonyzer2',
         'Development Status :: 3 - Alpha',
         'Topic :: Scientific/Engineering :: Image Recognition',
         'Intended Audience :: Science/Research'
-        ]      
+        ],
+      ext_modules=cythonize("inpaint.pyx")
       )
