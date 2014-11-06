@@ -186,7 +186,7 @@ def showIm(arr,returnIm=False):
     else:
         imnew.show()
 
-def estimateLocations(arr,nx,ny,diam=20,showPlt=True,pdfPlt=False):
+def estimateLocations(arr,nx,ny,diam=20,showPlt=True,pdf=None):
     '''Automatically search for best estimate for location of culture array'''
     # Generate windowed mean intensities, scanning along x and y axes
     sumx=numpy.array([numpy.mean(arr[0:arr.shape[0],numpy.max([0,dx-diam/4]):numpy.min([arr.shape[1],dx+diam/4])]) for dx in xrange(0,arr.shape[1])],dtype=numpy.float)
@@ -225,7 +225,7 @@ def estimateLocations(arr,nx,ny,diam=20,showPlt=True,pdfPlt=False):
             plt.axvline(x=cand,linestyle='--',linewidth=0.5,color="black")
         plt.xlabel('x coordinate (px)')
         plt.ylabel('Mean Intensity')
-        if pdfPlt:
+        if pdf!=None:
             pdf.savefig()
             plt.close()
         else:
@@ -236,7 +236,7 @@ def estimateLocations(arr,nx,ny,diam=20,showPlt=True,pdfPlt=False):
             plt.axvline(x=cand,linestyle='--',linewidth=0.5,color="black")
         plt.xlabel('Offset dx (px)')
         plt.ylabel('Autocorrelation')
-        if pdfPlt:
+        if pdf!=None:
             pdf.savefig()
             plt.close()
         else:
@@ -247,7 +247,7 @@ def estimateLocations(arr,nx,ny,diam=20,showPlt=True,pdfPlt=False):
             plt.axvline(x=cand,linestyle='--',linewidth=0.5,color="black")
         plt.xlabel('y coordinate (px)')
         plt.ylabel('Mean Intensity')
-        if pdfPlt:
+        if pdf!=None:
             pdf.savefig()
             plt.close()
         else:
@@ -258,7 +258,7 @@ def estimateLocations(arr,nx,ny,diam=20,showPlt=True,pdfPlt=False):
             plt.axvline(x=cand,linestyle='--',linewidth=0.5,color="black")
         plt.xlabel('Offset dy (px)')
         plt.ylabel('Autocorrelation')
-        if pdfPlt:
+        if pdf!=None:
             pdf.savefig()
             plt.close()
         else:
