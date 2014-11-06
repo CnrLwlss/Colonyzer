@@ -13,7 +13,7 @@ filelist=[]
 rootdict={}
 allfiles=os.listdir(fullpath)
 for filename in allfiles:
-    if len(filename)>4 and filename[-4:] in ['.jpg','.JPG','.jpeg','.JPEG','.tif','.TIF','.tiff','.TIFF']:
+    if len(filename)>4 and filename[-4:] in ['.jpg','.JPG','.jpeg','.JPEG','.tif','.TIF','.tiff','.TIFF','.PNG','.png']:
         filelist.append(filename)
         # Old style DLR barcodes
         if len(filename)==35:

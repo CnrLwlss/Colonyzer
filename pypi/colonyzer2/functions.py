@@ -602,7 +602,7 @@ def openImage(imName):
     arrN=numpy.array(img,dtype=numpy.float)
     return(im,arrN)
 
-def locateCultures(candx,candy,dx,dy,arrN):
+def locateCultures(candx,candy,dx,dy,arrN,search=0.4,radnum=3.0):
     '''Starting with initial guesses for culture locations, optimise individual culture locations and return locations data frame.'''
     nx,ny=len(candx),len(candy)
     diam=int(1.05*round(min(float(arrN.shape[0])/(ny+1),float(arrN.shape[1])/(nx+1))))
@@ -610,9 +610,8 @@ def locateCultures(candx,candy,dx,dy,arrN):
     cols,rows=numpy.meshgrid(numpy.arange(1,nx+1),numpy.arange(1,ny+1))
     d={"Row":rows.flatten(),"Column":cols.flatten(),"y":yloc.flatten(),"x":xloc.flatten()}
     locations=pandas.DataFrame(d)
-    rad=int(round(float(min(dx,dy))/2.0))
-    RAD=int(round(1.2*rad))
-    RAD=rad/6
+    rad=int(round(float(min(dx,dy))/radnum))
+    RAD=int(round(rad*search))
     for i in xrange(0,len(locations.x)):
         (x,y)=optimiseSpot(arrN,locations.x[i],locations.y[i],rad,RAD)
         locations.x[i]=x
@@ -643,16 +642,19 @@ def maskAndFill(arrN,finalMask,tol=5):
     
     (y_list,x_list)=numpy.where(finalMask)
     print("Filling in gaps")
-    while numpy.sum(numpy.abs(old-cutout_arr))/numpy.sum(finalMask)>tol or numpy.isnan(numpy.sum(numpy.abs(old-cutout_arr))/numpy.sum(finalMask)):
+    diff=100*tol
+    while diff>tol or numpy.isnan(diff):
         # Invert filling order at every pass to minimise bias towards a particular direction
         x_list=x_list[::-1]
         y_list=y_list[::-1]
-        print numpy.sum(numpy.abs(old-cutout_arr))/numpy.sum(finalMask)>tol, numpy.isnan(numpy.sum(numpy.abs(old-cutout_arr))/numpy.sum(finalMask))
+        print diff>tol, numpy.isnan(diff)
         old=numpy.copy(cutout_arr)
         # Markov field update
         for i in xrange(0,len(x_list)):
             plist=[cutout_arr[y_list[i],x_list[i]+1],cutout_arr[y_list[i]+1,x_list[i]],cutout_arr[y_list[i],x_list[i]-1],cutout_arr[y_list[i]-1,x_list[i]]]
             cutout_arr[y_list[i],x_list[i]]=stats.nanmean(plist)
+        diff=numpy.sum(numpy.abs(old-cutout_arr))/numpy.sum(finalMask)
+        diff=numpy.sum(numpy.abs(old*finalMask-cutout_arr*finalMask))/numpy.sum(finalMask)
     return(cutout_arr)
     
 def makeCorrectionMap(arr0,locations,smoothfactor=250,printMess=True):
@@ -800,16 +802,17 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
     # Construct a replicate ID
     # Split data by horizontal
     hSplit=[res[res[horizontal]==x] for x in horiz]
-    for h in hSplit:
-        repNo=0
-        h["Replicate"]=repNo
-        h.sort("Barcode",inplace=True)
-        for i in xrange(1,h.shape[0]):
-            if (h["Barcode"].iloc[i]!=h["Barcode"].iloc[i-1]) and (h["vertID"].iloc[i]==h["vertID"].iloc[i-1]):
-                repNo+=1
-            if (h["Barcode"].iloc[i]!=h["Barcode"].iloc[i-1]) and (h["vertID"].iloc[i]!=h["vertID"].iloc[i-1]):
-                repNo=0
-            h["Replicate"].iloc[i]=repNo
+    for cno,h in enumerate(hSplit):
+	print("Setting up data for column "+str(cno))
+        barcRepDict={}
+        h["Replicate"]=0
+        # Give each barcode a technical replicate number
+        vertIDs=h["vertID"].unique()
+        for vID in vertIDs:
+            vIDbarcs=h["Barcode"][h["vertID"]==vID].unique()
+            for repno,barcval in enumerate(vIDbarcs):
+                barcRepDict[barcval]=repno
+        h["Replicate"]=h["Barcode"].replace(barcRepDict)
         h["vertID"]=h["vertID"]+h["Replicate"].map(pad)
         h.sort("vertID",inplace=True)
     res=hSplit[0]
@@ -944,6 +947,7 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
             dat=colDat[colDat["vID"]==vID]
             if dat.shape[0]>0:
                 barc=dat["Barcode"].iloc[0]
+		print("Drawing:"+barc)
                 im=Image.open(closestImage[barc]).resize((int(round(scl*smw)),int(round(scl*smh))),Image.ANTIALIAS)
                 plateArr.paste(im,(int(round(col*smw*scl)),int(round(row*smh*scl))))
                 dat=res[res["Barcode"]==barc]
