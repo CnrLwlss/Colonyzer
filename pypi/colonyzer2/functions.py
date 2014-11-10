@@ -139,7 +139,7 @@ def getMaxima(intensity):
             maxima.append(numpy.mean(z)+1)
     return(maxima)
 
-def optimiseSpot(arr,x,y,rad,RAD):
+def optimiseSpotOLD(arr,x,y,rad,RAD):
     '''Search from x-RAD to x+RAD for pixel range dx-rad to dx+rad with the greatest mean intensity'''
     xmin,xmax=max(0,x-RAD),min(arr.shape[1],x+RAD)
     ymin,ymax=max(0,y-RAD),min(arr.shape[0],y+RAD)
@@ -168,6 +168,25 @@ def optimiseSpot(arr,x,y,rad,RAD):
         besty=y    
     return(bestx,besty)
 
+def optimiseSpot(arr,x,y,rad,RAD):
+	'''Search from x-RAD to x+RAD for pixel range dx-rad to dx+rad with the greatest mean intensity'''
+	xmin,xmax=max(0,x-RAD),min(arr.shape[1],x+RAD)
+	ymin,ymax=max(0,y-RAD),min(arr.shape[0],y+RAD)
+	# Generate windowed mean intensities, scanning along x and y axes
+	sumx=numpy.array([numpy.mean(arr[ymin:ymax,numpy.max([0,dx-rad]):numpy.min([arr.shape[1],dx+rad])]) for dx in xrange(xmin,xmax)],dtype=numpy.float)
+	sumy=numpy.array([numpy.mean(arr[numpy.max([0,dy-rad]):numpy.min([arr.shape[0],dy+rad]),xmin:xmax]) for dy in xrange(ymin,ymax)],dtype=numpy.float)
+	bestx=xmin+numpy.argmax(sumx)
+	besty=ymin+numpy.argmax(sumy)
+	plt.plot(sumx)
+	plt.axvline(x=bestx,linestyle='--',linewidth=0.5,color="black")
+	plt.show()
+	plt.plot(sumy)
+	plt.axvline(x=besty,linestyle='--',linewidth=0.5,color="black")
+	plt.show()
+	showIm(arr[ymin:ymax,xmin:xmax])
+	return(bestx,besty)
+	
+	
 def autocor(x):
     '''R-like autocorrelation function'''
     s = numpy.fft.fft(x)
@@ -602,23 +621,27 @@ def openImage(imName):
     arrN=numpy.array(img,dtype=numpy.float)
     return(im,arrN)
 
-def locateCultures(candx,candy,dx,dy,arrN,search=0.4,radnum=3.0):
-    '''Starting with initial guesses for culture locations, optimise individual culture locations and return locations data frame.'''
-    nx,ny=len(candx),len(candy)
-    diam=int(1.05*round(min(float(arrN.shape[0])/(ny+1),float(arrN.shape[1])/(nx+1))))
-    xloc,yloc=numpy.meshgrid(candx,candy)
-    cols,rows=numpy.meshgrid(numpy.arange(1,nx+1),numpy.arange(1,ny+1))
-    d={"Row":rows.flatten(),"Column":cols.flatten(),"y":yloc.flatten(),"x":xloc.flatten()}
-    locations=pandas.DataFrame(d)
-    rad=int(round(float(min(dx,dy))/radnum))
-    RAD=int(round(rad*search))
-    for i in xrange(0,len(locations.x)):
-        (x,y)=optimiseSpot(arrN,locations.x[i],locations.y[i],rad,RAD)
-        locations.x[i]=x
-        locations.y[i]=y
-    locations["Diameter"]=min(dx,dy)
-    print("Cultures located")
-    return(locations)
+def locateCultures(candx,candy,dx,dy,arrN,search=0.4,radnum=1.0):
+	'''Starting with initial guesses for culture locations, optimise individual culture locations and return locations data frame.'''
+	# radius is half width of spot tile, rad is "radius" of area tested for brightness (0<radnum<=1.0), RAD is half width of search space
+	nx,ny=len(candx),len(candy)
+	diam=int(1.05*round(min(float(arrN.shape[0])/(ny+1),float(arrN.shape[1])/(nx+1))))
+	xloc,yloc=numpy.meshgrid(candx,candy)
+	cols,rows=numpy.meshgrid(numpy.arange(1,nx+1),numpy.arange(1,ny+1))
+	d={"Row":rows.flatten(),"Column":cols.flatten(),"y":yloc.flatten(),"x":xloc.flatten()}
+	locations=pandas.DataFrame(d)
+	radius=float(min(dx,dy))/2.0
+	rad=radnum*radius
+	delta=int(round((radius-rad)/2.0))
+	rad=int(round(radius))
+	RAD=int(round(search*radius))
+	for i in xrange(0,len(locations.x)):
+		(x,y)=optimiseSpot(arrN,locations.x[i]+delta,locations.y[i]+delta,rad,RAD)
+		locations.x[i]=x-delta
+		locations.y[i]=y-delta
+	locations["Diameter"]=min(dx,dy)
+	print("Cultures located")
+	return(locations)
 
 def makeMask(arrN,thresh1,tol=5):
     '''Generate an agar mask and a pseudo-empty image from a plate with obvious cultures.  Cultures are identified by thresholding, cut out and filled using a Markov field update.'''
