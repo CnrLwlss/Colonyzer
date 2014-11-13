@@ -2,6 +2,7 @@ import numpy,pandas,PIL,math,os,sys,time,platform
 from datetime import datetime
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
+from matplotlib.patches import Rectangle
 from PIL import Image, ImageDraw, ImageFont
 from scipy import stats, optimize, ndimage, signal
 import scipy
@@ -168,24 +169,40 @@ def optimiseSpotOLD(arr,x,y,rad,RAD):
         besty=y    
     return(bestx,besty)
 
-def optimiseSpot(arr,x,y,rad,RAD):
+def optimiseSpot(arr,x,y,rad,RAD,mkPlots=False):
 	'''Search from x-RAD to x+RAD for pixel range dx-rad to dx+rad with the greatest mean intensity'''
 	xmin,xmax=max(0,x-RAD),min(arr.shape[1],x+RAD)
 	ymin,ymax=max(0,y-RAD),min(arr.shape[0],y+RAD)
 	# Generate windowed mean intensities, scanning along x and y axes
-	sumx=numpy.array([numpy.mean(arr[ymin:ymax,numpy.max([0,dx-rad]):numpy.min([arr.shape[1],dx+rad])]) for dx in xrange(xmin,xmax)],dtype=numpy.float)
-	sumy=numpy.array([numpy.mean(arr[numpy.max([0,dy-rad]):numpy.min([arr.shape[0],dy+rad]),xmin:xmax]) for dy in xrange(ymin,ymax)],dtype=numpy.float)
+	#sumx=numpy.array([numpy.mean(arr[ymin:ymax,numpy.max([0,dx-rad]):numpy.min([arr.shape[1],dx+rad])]) for dx in xrange(xmin,xmax)],dtype=numpy.float)
+	#sumy=numpy.array([numpy.mean(arr[numpy.max([0,dy-rad]):numpy.min([arr.shape[0],dy+rad]),xmin:xmax]) for dy in xrange(ymin,ymax)],dtype=numpy.float)
+
+        sumx=numpy.array([numpy.mean(arr[y:max(arr.shape[0],y+2*rad),xtarg:max(arr.shape[1],xtarg+2*rad)]) for xtarg in xrange(xmin,xmax)],dtype=numpy.float)
+        sumy=numpy.array([numpy.mean(arr[ytarg:max(arr.shape[0],ytarg+2*rad),x:max(arr.shape[1],x+2*rad)]) for ytarg in xrange(ymin,ymax)],dtype=numpy.float)
+
 	bestx=xmin+numpy.argmax(sumx)
 	besty=ymin+numpy.argmax(sumy)
-	plt.plot(sumx)
-	plt.axvline(x=bestx-xmin,linestyle='--',linewidth=0.5,color="black")
-	plt.show()
-	plt.plot(sumy)
-	plt.axvline(x=besty-ymin,linestyle='--',linewidth=0.5,color="black")
-	plt.show()
-	showIm(arr[ymin:ymax,xmin:xmax])
+
+	if mkPlots:
+            fig,ax=plt.subplots(2,2)
+            ax[0,0].plot(sumx)
+            ax[0,0].axvline(x=bestx-xmin,linestyle='--',linewidth=0.5,color="black")
+            ax[0,0].set_xlabel("x")
+            ax[0,0].set_ylabel("mean intensity")
+            ax[0,1].plot(sumy)
+            ax[0,1].axvline(x=besty-ymin,linestyle='--',linewidth=0.5,color="black")
+            ax[0,1].set_xlabel("y")
+            ax[0,1].set_ylabel("mean intensity")
+            ax[1,0].imshow(arr[(y-rad):(y+2*rad),(x-rad):(x+2*rad)]).set_clim(0.0,255.0)
+            ax[1,0].add_patch(Rectangle((rad,rad),rad,rad,alpha=1,facecolor="none"))
+            ax[1,0].set_xlabel("x")
+            ax[1,0].set_ylabel("y")
+            ax[1,1].imshow(arr[(besty-rad):(besty+2*rad),(bestx-rad):(bestx+2*rad)]).set_clim(0.0,255.0)
+            ax[1,1].add_patch(Rectangle((rad,rad),rad,rad,alpha=1,facecolor="none"))
+            ax[1,1].set_xlabel("x")
+            ax[1,1].set_ylabel("y")
+            plt.show()
 	return(bestx,besty)
-	
 	
 def autocor(x):
     '''R-like autocorrelation function'''
@@ -621,7 +638,7 @@ def openImage(imName):
     arrN=numpy.array(img,dtype=numpy.float)
     return(im,arrN)
 
-def locateCultures(candx,candy,dx,dy,arrN,search=0.4,radnum=1.0):
+def locateCultures(candx,candy,dx,dy,arrN,search=0.4,radnum=1.0,mkPlots=False):
 	'''Starting with initial guesses for culture locations, optimise individual culture locations and return locations data frame.'''
 	# radius is half width of spot tile, rad is "radius" of area tested for brightness (0<radnum<=1.0), RAD is half width of search space
 	nx,ny=len(candx),len(candy)
@@ -636,7 +653,7 @@ def locateCultures(candx,candy,dx,dy,arrN,search=0.4,radnum=1.0):
 	rad=int(round(radius))
 	RAD=int(round(search*radius))
 	for i in xrange(0,len(locations.x)):
-		(x,y)=optimiseSpot(arrN,locations.x[i]+delta,locations.y[i]+delta,rad,RAD)
+		(x,y)=optimiseSpot(arrN,locations.x[i]+delta,locations.y[i]+delta,rad,RAD,mkPlots)
 		locations.x[i]=x-delta
 		locations.y[i]=y-delta
 	locations["Diameter"]=min(dx,dy)
