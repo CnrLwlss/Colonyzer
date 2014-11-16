@@ -193,12 +193,12 @@ def optimiseSpot(arr,x,y,rad,RAD,mkPlots=False):
             ax[0,1].axvline(x=besty-ymin,linestyle='--',linewidth=0.5,color="black")
             ax[0,1].set_xlabel("y")
             ax[0,1].set_ylabel("mean intensity")
-            ax[1,0].imshow(arr[(y-rad):(y+2*rad),(x-rad):(x+2*rad)]).set_clim(0.0,255.0)
-            ax[1,0].add_patch(Rectangle((rad,rad),rad,rad,alpha=1,facecolor="none"))
+            ax[1,0].imshow(arr[(y-rad):(y+3*rad),(x-rad):(x+3*rad)]).set_clim(0.0,255.0)
+            ax[1,0].add_patch(Rectangle((rad,rad),2*rad,2*rad,alpha=1,facecolor="none"))
             ax[1,0].set_xlabel("x")
             ax[1,0].set_ylabel("y")
-            ax[1,1].imshow(arr[(besty-rad):(besty+2*rad),(bestx-rad):(bestx+2*rad)]).set_clim(0.0,255.0)
-            ax[1,1].add_patch(Rectangle((rad,rad),rad,rad,alpha=1,facecolor="none"))
+            ax[1,1].imshow(arr[(besty-rad):(besty+3*rad),(bestx-rad):(bestx+3*rad)]).set_clim(0.0,255.0)
+            ax[1,1].add_patch(Rectangle((rad,rad),2*rad,2*rad,alpha=1,facecolor="none"))
             ax[1,1].set_xlabel("x")
             ax[1,1].set_ylabel("y")
             plt.show()
@@ -638,7 +638,7 @@ def openImage(imName):
     arrN=numpy.array(img,dtype=numpy.float)
     return(im,arrN)
 
-def locateCultures(candx,candy,dx,dy,arrN,search=0.4,radnum=1.0,mkPlots=False):
+def locateCultures(candx,candy,dx,dy,arrN,search=0.4,radFrac=1.0,mkPlots=False):
 	'''Starting with initial guesses for culture locations, optimise individual culture locations and return locations data frame.'''
 	# radius is half width of spot tile, rad is "radius" of area tested for brightness (0<radnum<=1.0), RAD is half width of search space
 	nx,ny=len(candx),len(candy)
@@ -648,9 +648,9 @@ def locateCultures(candx,candy,dx,dy,arrN,search=0.4,radnum=1.0,mkPlots=False):
 	d={"Row":rows.flatten(),"Column":cols.flatten(),"y":yloc.flatten(),"x":xloc.flatten()}
 	locations=pandas.DataFrame(d)
 	radius=float(min(dx,dy))/2.0
-	rad=radnum*radius
+	rad=radFrac*radius
 	delta=int(round((radius-rad)/2.0))
-	rad=int(round(radius))
+	rad=int(round(rad))
 	RAD=int(round(search*radius))
 	for i in xrange(0,len(locations.x)):
 		(x,y)=optimiseSpot(arrN,locations.x[i]+delta,locations.y[i]+delta,rad,RAD,mkPlots)
@@ -722,7 +722,7 @@ def threshPreview(arr,thresh1,locations):
     colours=((255,0,0),(0,255,0),(0,0,255),(255,255,0),(0,255,255),(255,0,255))
     for i in xrange(0,len(locations.x)):
         x,y,r=int(round(locations.x[i])),int(round(locations.y[i])),int(round(float(locations.Diameter[i])/2.0))
-        draw.rectangle((x-r,y-r,x+r,y+r),outline=colours[i%5])
+        draw.rectangle((x,y,x+2*r,y+2*r),outline=colours[i%5])
     return(imthresh)
 
 def automaticThreshold(arr,label="",pdf=None):
