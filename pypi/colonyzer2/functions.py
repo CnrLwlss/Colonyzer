@@ -170,7 +170,7 @@ def optimiseSpotOLD(arr,x,y,rad,RAD):
     return(bestx,besty)
 
 def optimiseSpot(arr,x,y,rad,RAD,mkPlots=False):
-	'''Search from x-RAD to x+RAD for pixel range dx-rad to dx+rad with the greatest mean intensity'''
+	'''Search from x-RAD to x+RAD for pixel range dx-rad to dx+rad with the greatest mean intensity (coordinates are top-left corners of cultures)'''
 	xmin,xmax=max(0,x-RAD),min(arr.shape[1],x+RAD)
 	ymin,ymax=max(0,y-RAD),min(arr.shape[0],y+RAD)
 	# Generate windowed mean intensities, scanning along x and y axes
@@ -222,14 +222,15 @@ def showIm(arr,returnIm=False):
     else:
         imnew.show()
 
-def estimateLocations(arr,nx,ny,diam=20,showPlt=True,pdf=None):
-    '''Automatically search for best estimate for location of culture array'''
+def estimateLocations(arr,nx,ny,diam=20,windowFrac=0.25,smoothWindow=0.13,showPlt=True,pdf=None):
+    '''Automatically search for best estimate for location of culture array (based on culture centres, not top-left corner).'''
     # Generate windowed mean intensities, scanning along x and y axes
-    sumx=numpy.array([numpy.mean(arr[0:arr.shape[0],numpy.max([0,dx-diam/4]):numpy.min([arr.shape[1],dx+diam/4])]) for dx in xrange(0,arr.shape[1])],dtype=numpy.float)
-    sumy=numpy.array([numpy.mean(arr[numpy.max([0,dy-diam/4]):numpy.min([arr.shape[0],dy+diam/4]),0:arr.shape[1]]) for dy in xrange(0,arr.shape[0])],dtype=numpy.float)
+    window=int(round(diam*windowFrac))
+    sumx=numpy.array([numpy.mean(arr[0:arr.shape[0],numpy.max([0,dx-window]):numpy.min([arr.shape[1],dx+window])]) for dx in xrange(0,arr.shape[1])],dtype=numpy.float)
+    sumy=numpy.array([numpy.mean(arr[numpy.max([0,dy-window]):numpy.min([arr.shape[0],dy+window]),0:arr.shape[1]]) for dy in xrange(0,arr.shape[0])],dtype=numpy.float)
     # Smooth intensities to help eliminate small local maxima
-    sumx=ndimage.gaussian_filter1d(sumx,diam/7.5)
-    sumy=ndimage.gaussian_filter1d(sumy,diam/7.5)
+    sumx=ndimage.gaussian_filter1d(sumx,diam*smoothWindow)
+    sumy=ndimage.gaussian_filter1d(sumy,diam*smoothWindow)
     # First peak in autocorrelation function is best estimate of distance between spots
     dx=1+numpy.where(numpy.diff(numpy.sign(numpy.diff(autocor(sumx))))==-2)[0][0]
     dy=1+numpy.where(numpy.diff(numpy.sign(numpy.diff(autocor(sumy))))==-2)[0][0]
@@ -639,7 +640,7 @@ def openImage(imName):
     return(im,arrN)
 
 def locateCultures(candx,candy,dx,dy,arrN,search=0.4,radFrac=1.0,mkPlots=False):
-	'''Starting with initial guesses for culture locations, optimise individual culture locations and return locations data frame.'''
+	'''Starting with initial guesses for culture locations (top left corner), optimise individual culture locations and return locations (centre of spots) data frame.'''
 	# radius is half width of spot tile, rad is "radius" of area tested for brightness (0<radnum<=1.0), RAD is half width of search space
 	nx,ny=len(candx),len(candy)
 	diam=int(1.05*round(min(float(arrN.shape[0])/(ny+1),float(arrN.shape[1])/(nx+1))))
@@ -654,8 +655,9 @@ def locateCultures(candx,candy,dx,dy,arrN,search=0.4,radFrac=1.0,mkPlots=False):
 	RAD=int(round(search*radius))
 	for i in xrange(0,len(locations.x)):
 		(x,y)=optimiseSpot(arrN,locations.x[i]+delta,locations.y[i]+delta,rad,RAD,mkPlots)
-		locations.x[i]=x-delta
-		locations.y[i]=y-delta
+		# Note this returns coordinates of CENTRE OF SPOT
+		locations.x[i]=int(round(x-delta+dx/2.0))
+		locations.y[i]=int(round(y-delta+dy/2.0))
 	locations["Diameter"]=min(dx,dy)
 	print("Cultures located")
 	return(locations)
@@ -722,7 +724,7 @@ def threshPreview(arr,thresh1,locations):
     colours=((255,0,0),(0,255,0),(0,0,255),(255,255,0),(0,255,255),(255,0,255))
     for i in xrange(0,len(locations.x)):
         x,y,r=int(round(locations.x[i])),int(round(locations.y[i])),int(round(float(locations.Diameter[i])/2.0))
-        draw.rectangle((x,y,x+2*r,y+2*r),outline=colours[i%5])
+        draw.rectangle((x-r,y-r,x+r,y+r),outline=colours[i%5])
     return(imthresh)
 
 def automaticThreshold(arr,label="",pdf=None):
