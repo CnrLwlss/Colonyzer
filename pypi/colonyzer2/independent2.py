@@ -46,10 +46,10 @@ while len(imList)>0:
     #(candx,candy,dx,dy)=estimateLocations(arrN,nx,ny,diam,showPlt=False)
 
     # Update guesses and initialise locations data frame
-    locations=locateCultures(candx,candy,dx,dy,arrN)
+    locations=locateCultures([int(round(cx-dx/2.0)) for cx in candx],[int(round(cy-dy/2.0)) for cy in candy],dx,dy,arrN)
 
     # Trim outer part of image to remove plate walls
-    trimmed_arr=arrN[max(0,min(locations.y)-dy):min(arrN.shape[0],(max(locations.y)+dy)),max(0,(min(locations.x)-dx)):min(arrN.shape[1],(max(locations.x)+dx))]
+    trimmed_arr=arrN[max(0,int(round(min(locationsN.y)-dy/2.0))):min(arrN.shape[0],int(round((max(locationsN.y)+dy/2.0)))),max(0,int(round(min(locationsN.x)-dx/2.0))):min(arrN.shape[1],int(round((max(locationsN.x)+dx/2.0))))]
     (thresh,bindat)=automaticThreshold(trimmed_arr)
 
     print("Markov")

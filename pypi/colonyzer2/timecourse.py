@@ -56,7 +56,7 @@ def main(fmt="384"):
         (candx,candy,dx,dy)=estimateLocations(arrN,nx,ny,diam,showPlt=False)
 
         # Update guesses and initialise locations data frame
-        locationsN=locateCultures(candx,candy,dx,dy,arrN)
+        locationsN=locateCultures([int(round(cx-dx/2.0)) for cx in candx],[int(round(cy-dy/2.0)) for cy in candy],dx,dy,arrN)
 
         # Smooth (pseudo-)empty image 
         (correction_map,average_back)=makeCorrectionMap(arr0,locationsN,printMess=correction)
@@ -65,7 +65,7 @@ def main(fmt="384"):
         corrected_arrN=arrN*correction_map
 
         # Trim outer part of image to remove plate walls
-        trimmed_arr=arrN[max(0,min(locationsN.y)-dy):min(arr0.shape[0],(max(locationsN.y)+dy)),max(0,(min(locationsN.x)-dx)):min(arr0.shape[1],(max(locationsN.x)+dx))]
+        trimmed_arr=arrN[max(0,int(round(min(locationsN.y)-dy/2.0))):min(arrN.shape[0],int(round((max(locationsN.y)+dy/2.0)))),max(0,int(round(min(locationsN.x)-dx/2.0))):min(arrN.shape[1],int(round((max(locationsN.x)+dx/2.0))))]
         (thresh,bindat)=automaticThreshold(trimmed_arr)
 
         # Mask for identifying culture areas
@@ -78,8 +78,8 @@ def main(fmt="384"):
                 arr=arr*correction_map
             
             # Correct for lighting differences between plates
-            arrsm=arr[numpy.min(locationsN.y):numpy.max(locationsN.y),numpy.min(locationsN.x):numpy.max(locationsN.x)]
-            masksm=maskN[numpy.min(locationsN.y):numpy.max(locationsN.y),numpy.min(locationsN.x):numpy.max(locationsN.x)]
+            arrsm=arr[max(0,int(round(min(locationsN.y)-dy/2.0))):min(arrN.shape[0],int(round((max(locationsN.y)+dy/2.0)))),max(0,int(round(min(locationsN.x)-dx/2.0))):min(arrN.shape[1],int(round((max(locationsN.x)+dx/2.0))))]
+            masksm=maskN[max(0,int(round(min(locationsN.y)-dy/2.0))):min(arrN.shape[0],int(round((max(locationsN.y)+dy/2.0)))),max(0,int(round(min(locationsN.x)-dx/2.0))):min(arrN.shape[1],int(round((max(locationsN.x)+dx/2.0))))]
             meanPx=numpy.mean(arrsm[numpy.logical_not(masksm)])
 
             arr=arr+(average_back-meanPx)
