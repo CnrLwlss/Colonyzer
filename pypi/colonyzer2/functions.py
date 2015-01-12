@@ -603,6 +603,13 @@ def getImageNames(fullpath):
     imList.sort(reverse=True)
     return(imList)
 
+def checkAnalysisStarted(imname):
+    '''Check if Colonyzer has already analysed or is currently analysing the photo imname'''
+    base=os.path.basename(imname)
+    baseroot=base.split(".")[0]
+    dirname=os.path.dirname(imname)
+    return(os.path.exists(os.path.join(dirname,"Output_Data",baseroot+".out")))
+
 def getBarcodes(fullpath,barcRange=(0,15),checkDone=True):
     '''Get filenames for all images in current directory and all sub-directories.
 Return a dictionary of filenames, listed by barcode (plate ID)'''
@@ -872,7 +879,7 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
         for vID in vertIDs:
             vIDbarcs=h["Barcode"][h["vertID"]==vID].unique()
             for repno,barcval in enumerate(vIDbarcs):
-                barcRepDict[barcval]=repno
+                barcRepDict[barcval]=repno+1
         h["Replicate"]=h["Barcode"].replace(barcRepDict)
         h["vertID"]=h["vertID"]+h["Replicate"].map(pad)
         h.sort("vertID",inplace=True)

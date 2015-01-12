@@ -1,5 +1,5 @@
 from colonyzer2.functions import *
-import time, sys, os, numpy, PIL
+import time, sys, os, numpy, PIL, json
 
 def main():
     print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
@@ -15,6 +15,7 @@ def main():
     correction=True
     threshplots=False
     fixedThresh=0
+    fdict=""
     if len(sys.argv)>1:
         if '--nolc' in sys.argv:
             print "No lighting correction..."
@@ -23,14 +24,29 @@ def main():
             ind=sys.argv.index('--fixthresh')+1
             fixedThresh=float(sys.argv[ind])
             print "Using fixed threshold "+str(fixedThresh)
-        if'--threshplots' in sys.argv:
+        if '--threshplots' in sys.argv:
             threshplots=True
             print "Plotting pixel intensity distributions"
+        if '--usedict' in sys.argv:
+            # Expect .json file in AUXILIARY directory for experiment
+            ind=sys.argv.index('--usedict')+1
+            expt=sys.argv[ind]
+            print "Loading barcodes for experiment "+expt
+            exptType=expt[0:-4]
+            rootDir=os.getcwd()
+            fdict=os.path.join(rootDir,exptType+"_EXPERIMENTS",expt,"AUXILIARY",expt+"_C2.json")
 
     start=time.time()
 
-    # Find image files which have yet to be analysed
-    barcdict=getBarcodes(os.getcwd(),barcRange)
+    if(fdict!=""):
+        with open(fdict, 'rb') as fp:
+            barcdict = json.load(fp)
+            # Drop any barcodes that are currently being analysed/already analysed
+            barcdict={x:barcdict[x] for x in barcdict.keys() if not checkAnalysisStarted(barcdict[x][-1])}
+    else:
+        # Find image files which have yet to be analysed
+        barcdict=getBarcodes(os.getcwd(),barcRange)
+        
     # Setup output directories if not already present
     rept=setupDirectories(barcdict)
     if len(rept)>0:
@@ -38,11 +54,10 @@ def main():
         for line in rept:
             print rept
 
-    InsData=readInstructions(os.getcwd())
-
-
     while len(barcdict)>0:
         BARCODE=barcdict.keys()[0]
+        imdir=os.path.dirname(barcdict[BARCODE][0])
+        InsData=readInstructions(imdir)
         print(BARCODE)
         LATESTIMAGE=barcdict[BARCODE][0]
         EARLIESTIMAGE=barcdict[BARCODE][-1]
@@ -129,7 +144,8 @@ def main():
 
         # Get ready for next image
         print("Finished: "+FILENAME+" "+str(time.time()-start)+" s")
-        barcdict=getBarcodes(os.getcwd(),barcRange)
+
+        barcdict={x:barcdict[x] for x in barcdict.keys() if not checkAnalysisStarted(barcdict[x][-1])}
         
         # Setup output directories if not already present
         rept=setupDirectories(barcdict)

@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
-from Cython.Build import cythonize
+#from Cython.Build import cythonize
 setup(name='Colonyzer2',
-      version='1.0.84',
+      version='1.0.86',
       packages=['colonyzer2'],
       description='Image analysis for microbial cultures growing on solid agar surfaces',
       long_description=open('README.txt').read(),
