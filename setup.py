@@ -1,5 +1,7 @@
 from setuptools import setup, find_packages
-#from Cython.Build import cythonize
+from Cython.Build import cythonize
+import numpy
+
 setup(name='Colonyzer2',
       version='1.0.87',
       packages=['colonyzer2'],
@@ -16,6 +18,7 @@ setup(name='Colonyzer2',
         'Development Status :: 3 - Alpha',
         'Topic :: Scientific/Engineering :: Image Recognition',
         'Intended Audience :: Science/Research'
-        ]
-      #ext_modules=cythonize("inpaint.pyx")
+        ],
+      ext_modules=cythonize("colonyzer2/maskfill.pyx"),
+      include_dirs=[numpy.get_include()]
       )
