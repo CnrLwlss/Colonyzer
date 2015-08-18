@@ -2,8 +2,8 @@ Output_Images/
 Output_Data/
 *.bak
 *.pyc
-pypi/dist/
-pypi/Output_Images/
-pypi/Output_Data/
-pypi/build/
-pypi/Colonyzer2.egg-info
+dist/
+Auxiliary/Data/Output_Images/
+Auxiliary/Data/Output_Data/
+build/
+Colonyzer2.egg-info
