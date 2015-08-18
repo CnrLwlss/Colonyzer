@@ -1,0 +1,6 @@
+[console_scripts]
+fixedpos = colonyzer2.timecourse_fixedpos:main
+independent = colonyzer2.independent:main
+parametryzer = colonyzer2.parameteryzer_script:main
+timecourse = colonyzer2.timecourse:main
+
