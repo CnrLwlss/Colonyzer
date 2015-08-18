@@ -666,27 +666,27 @@ def openImage(imName):
     return(im,arrN)
 
 def locateCultures(candx,candy,dx,dy,arrN,search=0.4,radFrac=1.0,mkPlots=False):
-	'''Starting with initial guesses for culture locations (top left corner), optimise individual culture locations and return locations (centre of spots) data frame.'''
-	# radius is half width of spot tile, rad is "radius" of area tested for brightness (0<radnum<=1.0), RAD is half width of search space
-	nx,ny=len(candx),len(candy)
-	diam=int(1.05*round(min(float(arrN.shape[0])/(ny+1),float(arrN.shape[1])/(nx+1))))
-	xloc,yloc=numpy.meshgrid(candx,candy)
-	cols,rows=numpy.meshgrid(numpy.arange(1,nx+1),numpy.arange(1,ny+1))
-	d={"Row":rows.flatten(),"Column":cols.flatten(),"y":yloc.flatten(),"x":xloc.flatten()}
-	locations=pandas.DataFrame(d)
-	radius=float(min(dx,dy))/2.0
-	rad=radFrac*radius
-	delta=int(round((radius-rad)/2.0))
-	rad=int(round(rad))
-	RAD=int(round(search*radius))
-	for i in xrange(0,len(locations.x)):
-		(x,y)=optimiseSpot(arrN,locations.x[i]+delta,locations.y[i]+delta,rad,RAD,mkPlots)
-		# Note this returns coordinates of CENTRE OF SPOT
-		locations.x[i]=int(round(x-delta+dx/2.0))
-		locations.y[i]=int(round(y-delta+dy/2.0))
-	locations["Diameter"]=min(dx,dy)
-	print("Cultures located")
-	return(locations)
+    '''Starting with initial guesses for culture locations (top left corner), optimise individual culture locations and return locations (centre of spots) data frame.'''
+    # radius is half width of spot tile, rad is "radius" of area tested for brightness (0<radnum<=1.0), RAD is half width of search space
+    nx,ny=len(candx),len(candy)
+    diam=int(1.05*round(min(float(arrN.shape[0])/(ny+1),float(arrN.shape[1])/(nx+1))))
+    xloc,yloc=numpy.meshgrid(candx,candy)
+    cols,rows=numpy.meshgrid(numpy.arange(1,nx+1),numpy.arange(1,ny+1))
+    d={"Row":rows.flatten(),"Column":cols.flatten(),"y":yloc.flatten(),"x":xloc.flatten()}
+    locations=pandas.DataFrame(d)
+    radius=float(min(dx,dy))/2.0
+    rad=radFrac*radius
+    delta=int(round((radius-rad)/2.0))
+    rad=int(round(rad))
+    RAD=int(round(search*radius))
+    for i in xrange(0,len(locations.x)):
+            (x,y)=optimiseSpot(arrN,locations.x[i]+delta,locations.y[i]+delta,rad,RAD,mkPlots)
+            # Note this returns coordinates of CENTRE OF SPOT
+            locations.x[i]=int(round(x-delta+dx/2.0))
+            locations.y[i]=int(round(y-delta+dy/2.0))
+    locations["Diameter"]=min(dx,dy)
+    print("Cultures located")
+    return(locations)
 
 def makeMask(arrN,thresh1,tol=5):
     '''Generate an agar mask and a pseudo-empty image from a plate with obvious cultures.  Cultures are identified by thresholding, cut out and filled using a Markov field update.'''
