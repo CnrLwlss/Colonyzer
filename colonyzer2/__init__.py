@@ -1,2 +1,2 @@
 __all__=['functions']
-#from . import functions
+from functions import *
