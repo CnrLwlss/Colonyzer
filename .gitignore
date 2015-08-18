@@ -6,4 +6,5 @@ dist/
 Auxiliary/Data/Output_Images/
 Auxiliary/Data/Output_Data/
 build/
+dist/
 Colonyzer2.egg-info/
