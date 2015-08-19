@@ -14,5 +14,4 @@ http://www.jove.com/video/4018
 
 To submit changes to PYPI
 
-	python setup.py register
-	python setup.py sdist upload
+	python setup.py register sdist upload

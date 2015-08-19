@@ -1,4 +1,4 @@
-from colonyzer2.functions import *
+from colonyzer2 import *
 import time
 
 

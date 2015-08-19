@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.patches import Rectangle
 from PIL import Image, ImageDraw, ImageFont
-from scipy import stats, optimize, ndimage, signal
 import scipy
+from scipy import stats, optimize, ndimage, signal
 
 def is_number(s):
     try:
