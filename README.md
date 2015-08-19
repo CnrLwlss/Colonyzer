@@ -12,6 +12,10 @@ http://dx.doi.org/10.1186/1471-2105-11-287
 Open access video and manuscript demonstrating the use of Colonyzer within a Quantitative Fitness Analysis workflow
 http://www.jove.com/video/4018
 
-To submit changes to PYPI
+To register project with PYPI:
 
-	python setup.py register sdist upload
+	python setup.py register 
+	
+Once project has been registered, submit updates by:
+
+    python setup.py sdist upload
