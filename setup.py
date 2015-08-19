@@ -27,7 +27,8 @@ def git_version():
 
     return GIT_REVISION
 
-VERSION='1.0.88'+"."+git_version()
+version='1.0.88'
+VERSION=version+"."+git_version()
 f=open('colonyzer2/version.py',"w")
 f.write("__version__='{}'".format(VERSION))
 f.close()
@@ -37,7 +38,7 @@ f.close()
 # http://www.scotttorborg.com/python-packaging/
 
 setup(name='Colonyzer2',
-      version=VERSION,
+      version=version,
       packages=['colonyzer2','scripts'],
       description='Image analysis for microbial cultures growing on solid agar surfaces',
       long_description=open('README.txt').read(),
