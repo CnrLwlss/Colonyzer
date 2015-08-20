@@ -1,5 +1,19 @@
-from colonyzer2 import *
-import time, sys, os, numpy, PIL, json
+import colonyzer2 as c2
+import json
+import argparse
+import shutil
+import string
+
+def parseArgs():
+    parser=argparse.ArgumentParser(description="Analyse timeseries of QFA images: locate cultures on plate, segment image into agar and cells, apply lighting correction, write report including cell density estimates for each location in each image.")
+    parser.add_argument("dir", type=str, help="Directory in which to search for image files that have not been analysed (current directory by default).")
+    parser.add_argument("-l","--lcorr",type=bool, help="Carry out lighting correction?")
+    parser.add_argument("-f","--fixthresh",type=float, help="Value to fix image segmentation threshold at (default is automatic thresholding).")
+    parser.add_argument("-t","--threshplots",type=bool, help="Plot pixel intensity distributions and segmentation thresholds.")
+    parser.add_argument("-u","--usedict",type=str, help="Load .json file specifying images to analyse.")
+    args = parser.parse_args()
+    return(args)
+
 
 def main():
     print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")

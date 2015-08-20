@@ -33,7 +33,6 @@ f=open('colonyzer2/version.py',"w")
 f.write("__version__='{}'".format(VERSION))
 f.close()
 
-
 # Nice tutorial on packaging python code:
 # http://www.scotttorborg.com/python-packaging/
 

@@ -1,5 +1,4 @@
 from colonyzer2 import *
-import time
 
 def main():
     print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")

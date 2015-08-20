@@ -1,5 +1,4 @@
 from colonyzer2 import *
-import time, sys
 
 def main(fmt="384"):
     # Plate format names and dimension definitions
