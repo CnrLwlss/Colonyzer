@@ -2,6 +2,7 @@ Output_Images/
 Output_Data/
 *.bak
 *.pyc
+*HistogramReport.pdf
 dist/
 Auxiliary/Data/Output_Images/
 Auxiliary/Data/Output_Data/

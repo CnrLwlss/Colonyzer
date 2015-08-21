@@ -189,20 +189,20 @@ def optimiseSpot(arr,x,y,rad,RAD,mkPlots=False):
     return(bestx,besty)
 
 def optimiseSpotCANDIDATE(arr,x,y,rad,RAD,mkPlots=False):
-	'''Search from x-RAD to x+RAD for pixel range dx-rad to dx+rad with the greatest mean intensity (coordinates are top-left corners of cultures)'''
-	xmin,xmax=max(0,x-RAD),min(arr.shape[1],x+RAD)
-	ymin,ymax=max(0,y-RAD),min(arr.shape[0],y+RAD)
-	# Generate windowed mean intensities, scanning along x and y axes
-	#sumx=numpy.array([numpy.mean(arr[ymin:ymax,numpy.max([0,dx-rad]):numpy.min([arr.shape[1],dx+rad])]) for dx in xrange(xmin,xmax)],dtype=numpy.float)
-	#sumy=numpy.array([numpy.mean(arr[numpy.max([0,dy-rad]):numpy.min([arr.shape[0],dy+rad]),xmin:xmax]) for dy in xrange(ymin,ymax)],dtype=numpy.float)
+        '''Search from x-RAD to x+RAD for pixel range dx-rad to dx+rad with the greatest mean intensity (coordinates are top-left corners of cultures)'''
+        xmin,xmax=max(0,x-RAD),min(arr.shape[1],x+RAD)
+        ymin,ymax=max(0,y-RAD),min(arr.shape[0],y+RAD)
+        # Generate windowed mean intensities, scanning along x and y axes
+        #sumx=numpy.array([numpy.mean(arr[ymin:ymax,numpy.max([0,dx-rad]):numpy.min([arr.shape[1],dx+rad])]) for dx in xrange(xmin,xmax)],dtype=numpy.float)
+        #sumy=numpy.array([numpy.mean(arr[numpy.max([0,dy-rad]):numpy.min([arr.shape[0],dy+rad]),xmin:xmax]) for dy in xrange(ymin,ymax)],dtype=numpy.float)
 
         sumx=numpy.array([numpy.mean(arr[y:max(arr.shape[0],y+2*rad),xtarg:max(arr.shape[1],xtarg+2*rad)]) for xtarg in xrange(xmin,xmax)],dtype=numpy.float)
         sumy=numpy.array([numpy.mean(arr[ytarg:max(arr.shape[0],ytarg+2*rad),x:max(arr.shape[1],x+2*rad)]) for ytarg in xrange(ymin,ymax)],dtype=numpy.float)
 
-	bestx=xmin+numpy.argmax(sumx)
-	besty=ymin+numpy.argmax(sumy)
+        bestx=xmin+numpy.argmax(sumx)
+        besty=ymin+numpy.argmax(sumy)
 
-	if mkPlots:
+        if mkPlots:
             fig,ax=plt.subplots(2,2)
             ax[0,0].plot(sumx)
             ax[0,0].axvline(x=bestx-xmin,linestyle='--',linewidth=0.5,color="black")
@@ -221,8 +221,8 @@ def optimiseSpotCANDIDATE(arr,x,y,rad,RAD,mkPlots=False):
             ax[1,1].set_xlabel("x")
             ax[1,1].set_ylabel("y")
             plt.show()
-	return(bestx,besty)
-	
+        return(bestx,besty)
+
 def autocor(x):
     '''R-like autocorrelation function'''
     s = numpy.fft.fft(x)
@@ -563,7 +563,7 @@ def saveColonyzer(filename,locs,thresh,dx,dy):
     dataf.to_csv(filename,"\t",index=False,header=False,cols=colorder,engine='python')
     return(dataf)
 
-def setupDirectories(dictlist):
+def setupDirectories(dictlist,verbose=False):
     '''Create output directories and return paths for writing/reading files'''
     if isinstance(dictlist,dict):
         # Flatten dictionary to list:
@@ -576,8 +576,11 @@ def setupDirectories(dictlist):
     # Create directories for storing output data and preview images
     for directory in dirs:
         try:
-            os.mkdir(os.path.join(directory,"Output_Images"))
-            os.mkdir(os.path.join(directory,"Output_Data"))
+            imdir=os.path.join(directory,"Output_Images")
+            datdir=os.path.join(directory,"Output_Data")
+            os.mkdir(imdir)
+            os.mkdir(datdir)
+            if verbose: print("Created "+imdir+" & "+datdir+".")
             newdirs.append(directory)
         except:
             continue
@@ -610,7 +613,7 @@ def checkAnalysisStarted(imname):
     dirname=os.path.dirname(imname)
     return(os.path.exists(os.path.join(dirname,"Output_Data",baseroot+".out")))
 
-def getBarcodes(fullpath,barcRange=(0,15),checkDone=True):
+def getBarcodes(fullpath,barcRange=(0,15),checkDone=True,verbose=False):
     '''Get filenames for all images in current directory and all sub-directories.
 Return a dictionary of filenames, listed by barcode (plate ID)'''
     allfiles=[]
@@ -640,6 +643,7 @@ Return a dictionary of filenames, listed by barcode (plate ID)'''
         fnames=numpy.array([os.path.basename(x) for x in barcdict[b]])
         barcdict[b]=list(numpy.array(barcdict[b])[fnames.argsort()])[::-1]
         #barcdict[b].sort(reverse=True)
+    if verbose and not barcdict: print("No new images to analyse found in "+fullpath+".")
     return(barcdict)
 
 def merge_dols(dol1, dol2):
@@ -725,13 +729,12 @@ def maskAndFill(arrN,finalMask,tol=5):
         diff=numpy.sum(numpy.abs(old*finalMask-cutout_arr*finalMask))/numpy.sum(finalMask)
     return(cutout_arr)
     
-def makeCorrectionMap(arr0,locations,smoothfactor=250,printMess=True):
+def makeCorrectionMap(arr0,locations,smoothfactor=250,verbose=True):
     '''Smooth a (pseudo-)empty plate image to generate a correction map.'''
     smoothed_arr=ndimage.gaussian_filter(arr0,arr0.shape[1]/smoothfactor)
     average_back=numpy.mean(smoothed_arr[numpy.min(locations.y):numpy.max(locations.y),numpy.min(locations.x):numpy.max(locations.x)])
     correction_map=average_back/smoothed_arr
-    if printMess:
-        print("Lighting correction map constructed")
+    if verbose: print("Lighting correction map constructed.")
     return(correction_map,average_back)
 
 def measureSizeAndColour(locations,arr,im,finalmask,average_back,barcode,filename):
@@ -871,7 +874,7 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
     # Split data by horizontal
     hSplit=[res[res[horizontal]==x] for x in horiz]
     for cno,h in enumerate(hSplit):
-	print("Setting up data for column "+str(cno))
+        print("Setting up data for column "+str(cno))
         barcRepDict={}
         h["Replicate"]=0
         # Give each barcode a technical replicate number
@@ -1015,7 +1018,7 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
             dat=colDat[colDat["vID"]==vID]
             if dat.shape[0]>0:
                 barc=dat["Barcode"].iloc[0]
-		print("Drawing:"+barc)
+                print("Drawing:"+barc)
                 im=Image.open(closestImage[barc]).resize((int(round(scl*smw)),int(round(scl*smh))),Image.ANTIALIAS)
                 plateArr.paste(im,(int(round(col*smw*scl)),int(round(row*smh*scl))))
                 dat=res[res["Barcode"]==barc]
