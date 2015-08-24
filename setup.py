@@ -4,6 +4,8 @@ import numpy
 import os
 import subprocess
 
+# http://stackoverflow.com/questions/4505747/how-should-i-structure-a-python-package-that-contains-cython-code
+
 def git_version():
     def _minimal_ext_cmd(cmd):
         # construct minimal environment
