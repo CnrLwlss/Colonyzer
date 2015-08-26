@@ -101,7 +101,6 @@ def locateJSON(scrID,dirHTS='.',verbose=False):
     fdict=os.path.join(dirHTS,exptType+"_EXPERIMENTS",scrID,"AUXILIARY",scrID+"_C2.json")
     return(fdict)
 
-
 def prepareTimecourse(barcdict,verbose=False):
     '''In timecourse mode, prepares "next" batch of images for analysis from dictionary of image names (unique image barcodes are dictionary keys).'''
     BARCs=barcdict.keys()
@@ -120,7 +119,7 @@ def prepareTimecourse(barcdict,verbose=False):
     return((BARCODE,imdir,InsData,LATESTIMAGE,EARLIESTIMAGE,imRoot))
 
 def loadLocationGuesses(IMAGE,InsData):
-    '''Set up initial guesses for location of spots on image by parsing data from Colonyzer.txt'''
+    '''Set up initial guesses for location of (centres of) spots on image by parsing data from Colonyzer.txt'''
     # If we have ColonyzerParametryzer output for this filename, use it for initial culture location estimates
     if os.path.basename(IMAGE) in InsData:
         (candx,candy,dx,dy)=c2.SetUp(InsData[os.path.basename(IMAGE)])
@@ -155,6 +154,10 @@ def edgeFill(arr,locations,cutoff=0.8):
 def main(inp="",verbose=False):
     print("Colonyzer "+c2.__version__)
 
+    cutFromFirst=False
+    cythonFill=False
+    updateLocations=True
+
     var=buildVars(verbose=verbose,inp=inp)
     correction,fixedThresh,threshplots,initpos,fdict,fdir,nrow,ncol=(var["lc"],var["fixedThresh"],var["threshplots"],var["initpos"],var["fdict"],var["fdir"],var["nrow"],var["ncol"])
     barcdict=checkImages(fdir,fdict,verbose=verbose)
@@ -163,12 +166,8 @@ def main(inp="",verbose=False):
     start=time.time()
 
     while len(barcdict)>0:
-        BARCODE,imdir,InsData,LATESTIMAGE,EARLIESTIMAGE,imRoot=prepareTimecourse(barcdict,verbose=True)  
-
-        if initpos and (InsData==None):
-            print("Colonyzer.txt file required in image directory, but none found.  Please generate Colonyzer.txt file using Parametryzer and try again.  Alternatively, run Colonyzer with -i argument to automatically generate initial guess for culture locations.")
-            break
-        
+        BARCODE,imdir,InsData,LATESTIMAGE,EARLIESTIMAGE,imRoot=prepareTimecourse(barcdict,verbose=verbose)  
+       
         # Create empty file to indicate that barcode is currently being analysed, to allow parallel analysis (lock files)
         tmp=open(os.path.join(os.path.dirname(EARLIESTIMAGE),"Output_Data",os.path.basename(EARLIESTIMAGE).split(".")[0]+".out"),"w").close()
 
@@ -183,13 +182,12 @@ def main(inp="",verbose=False):
         else:
             # Automatically generate guesses for gridded array locations
             diam=int(1.05*round(min(float(arrN.shape[0])/(nrow+1),float(arrN.shape[1])/(ncol+1))))
-            (candx,candy,dx,dy)=estimateLocations(arrN,ncol,nrow,diam,showPlt=False)
+            (candx,candy,dx,dy)=c2.estimateLocations(arrN,ncol,nrow,diam,showPlt=False)
 
         # Update guesses and initialise locations data frame
-        locationsN=c2.locateCultures([int(round(cx-dx/2.0)) for cx in candx],[int(round(cy-dy/2.0)) for cy in candy],dx,dy,arrN)
+        locationsN=c2.locateCultures([int(round(cx-dx/2.0)) for cx in candx],[int(round(cy-dy/2.0)) for cy in candy],dx,dy,arrN,update=updateLocations)
 
-        cutFromFirst=False
-        cythonFill=False
+
         
         if cutFromFirst:
             mask=edgeFill(arr0,locationsN,0.8)
@@ -263,4 +261,4 @@ def main(inp="",verbose=False):
     print("No more barcodes to analyse... I'm done.")
 
 if __name__ == '__main__':
-    main(verbose=True,inp="-d ../Auxiliary/Data -c -t -o 384 -i")
+    main(verbose=True,inp="-d ../Auxiliary/Data -c -t -o 384")
