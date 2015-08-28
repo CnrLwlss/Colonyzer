@@ -182,13 +182,11 @@ def main(inp="",verbose=False):
         else:
             # Automatically generate guesses for gridded array locations
             diam=int(1.05*round(min(float(arrN.shape[0])/(nrow+1),float(arrN.shape[1])/(ncol+1))))
-            (candx,candy,dx,dy)=c2.estimateLocations(arrN,ncol,nrow,diam,showPlt=False)
+            (candx,candy,dx,dy)=c2.estimateLocations(arrN,ncol,nrow,diam,showPlt=True)
 
         # Update guesses and initialise locations data frame
-        locationsN=c2.locateCultures([int(round(cx-dx/2.0)) for cx in candx],[int(round(cy-dy/2.0)) for cy in candy],dx,dy,arrN,update=updateLocations)
+        locationsN=c2.locateCultures([int(round(cx-dx/2.0)) for cx in candx],[int(round(cy-dy/2.0)) for cy in candy],dx,dy,arrN,update=updateLocations,mkPlots=False)
 
-
-        
         if cutFromFirst:
             mask=edgeFill(arr0,locationsN,0.8)
             startFill=time.time()
