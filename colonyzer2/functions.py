@@ -6,6 +6,9 @@ from matplotlib.patches import Rectangle
 from PIL import Image, ImageDraw, ImageFont
 import scipy
 from scipy import stats, optimize, ndimage, signal
+import scipy.optimize as op
+import itertools
+
 
 def is_number(s):
     try:
@@ -22,7 +25,7 @@ def readInstructions(fullpath,fname='Colonyzer.txt'):
     InsTemp=Instructions.readlines()
 
     defaultArr=[]
-    for x in xrange(0,len(InsTemp)):
+    for x in range(0,len(InsTemp)):
         if InsTemp[x][0]!="#" and InsTemp[x][0]!="\n":
             tlist=InsTemp[x].split(',')
             # default with no date specified
@@ -74,7 +77,7 @@ def SetUp(instructarr,imageDate=""):
             if imageDate>=min(dates):
                 lastDate=dates[[i<=imageDate for i in dates].index(True)]
             else:
-                print "Error, image date not in range of calibration dates"
+                print ("Error, image date not in range of calibration dates")
                 return
             for j in range(0,len(instructarr)):
                 if instructarr[j][5]==lastDate:
@@ -82,7 +85,7 @@ def SetUp(instructarr,imageDate=""):
             # Analyse based on relevant calibration
             instructarr=tmparr
         else:
-            print "Please specify an image date to use calibration file with multiple defaults."
+            print ("Please specify an image date to use calibration file with multiple defaults.")
             return
     if any(isinstance(el, list) for el in instructarr) and len(instructarr)==1:
         instructarr=instructarr[0]
@@ -105,11 +108,11 @@ def SetUp(instructarr,imageDate=""):
 
     # Parameter for specifying the search area (area is (NSearch*2+1)^2)
     NSearch = int(round(3.0*float(min(xdim,ydim))/8.0))
-    print "Instructions: ",xstart,ystart,xdim,ydim,NSearch
+    print ("Instructions: ",xstart,ystart,xdim,ydim,NSearch)
     candx,candy=[],[]
-    for ROW in xrange(norows):
+    for ROW in range(norows):
         candy.append(int(round(ystart+ydimf/2.0+float(ROW)*ydimf)))
-    for COL in xrange(nocols):
+    for COL in range(nocols):
         candx.append(int(round(xstart+xdimf/2.0+float(COL)*xdimf)))
     return((candx,candy,xdim,ydim))
 
@@ -150,8 +153,8 @@ def optimiseSpot(arr,x,y,rad,RAD,mkPlots=False):
     xmin,xmax=max(0,x-RAD),min(arr.shape[1],x+RAD)
     ymin,ymax=max(0,y-RAD),min(arr.shape[0],y+RAD)
     # Generate windowed mean intensities, scanning along x and y axes
-    sumx=numpy.array([numpy.mean(arr[ymin:ymax,numpy.max([0,dx-rad]):numpy.min([arr.shape[1],dx+rad])]) for dx in xrange(xmin,xmax)],dtype=numpy.float)
-    sumy=numpy.array([numpy.mean(arr[numpy.max([0,dy-rad]):numpy.min([arr.shape[0],dy+rad]),xmin:xmax]) for dy in xrange(ymin,ymax)],dtype=numpy.float)
+    sumx=numpy.array([numpy.mean(arr[ymin:ymax,numpy.max([0,dx-rad]):numpy.min([arr.shape[1],dx+rad])]) for dx in range(xmin,xmax)],dtype=numpy.float)
+    sumy=numpy.array([numpy.mean(arr[numpy.max([0,dy-rad]):numpy.min([arr.shape[0],dy+rad]),xmin:xmax]) for dy in range(ymin,ymax)],dtype=numpy.float)
     # Find all maxima
     maxx=1+numpy.where(numpy.diff(numpy.sign(numpy.diff(sumx)))==-2)[0]
     maxy=1+numpy.where(numpy.diff(numpy.sign(numpy.diff(sumy)))==-2)[0]
@@ -198,11 +201,11 @@ def optimiseSpotCANDIDATE(arr,x,y,rad,RAD,mkPlots=False):
         xmin,xmax=max(0,x-RAD),min(arr.shape[1],x+RAD)
         ymin,ymax=max(0,y-RAD),min(arr.shape[0],y+RAD)
         # Generate windowed mean intensities, scanning along x and y axes
-        #sumx=numpy.array([numpy.mean(arr[ymin:ymax,numpy.max([0,dx-rad]):numpy.min([arr.shape[1],dx+rad])]) for dx in xrange(xmin,xmax)],dtype=numpy.float)
-        #sumy=numpy.array([numpy.mean(arr[numpy.max([0,dy-rad]):numpy.min([arr.shape[0],dy+rad]),xmin:xmax]) for dy in xrange(ymin,ymax)],dtype=numpy.float)
+        #sumx=numpy.array([numpy.mean(arr[ymin:ymax,numpy.max([0,dx-rad]):numpy.min([arr.shape[1],dx+rad])]) for dx in range(xmin,xmax)],dtype=numpy.float)
+        #sumy=numpy.array([numpy.mean(arr[numpy.max([0,dy-rad]):numpy.min([arr.shape[0],dy+rad]),xmin:xmax]) for dy in range(ymin,ymax)],dtype=numpy.float)
 
-        sumx=numpy.array([numpy.mean(arr[y:max(arr.shape[0],y+2*rad),xtarg:max(arr.shape[1],xtarg+2*rad)]) for xtarg in xrange(xmin,xmax)],dtype=numpy.float)
-        sumy=numpy.array([numpy.mean(arr[ytarg:max(arr.shape[0],ytarg+2*rad),x:max(arr.shape[1],x+2*rad)]) for ytarg in xrange(ymin,ymax)],dtype=numpy.float)
+        sumx=numpy.array([numpy.mean(arr[y:max(arr.shape[0],y+2*rad),xtarg:max(arr.shape[1],xtarg+2*rad)]) for xtarg in range(xmin,xmax)],dtype=numpy.float)
+        sumy=numpy.array([numpy.mean(arr[ytarg:max(arr.shape[0],ytarg+2*rad),x:max(arr.shape[1],x+2*rad)]) for ytarg in range(ymin,ymax)],dtype=numpy.float)
 
         bestx=xmin+numpy.argmax(sumx)
         besty=ymin+numpy.argmax(sumy)
@@ -246,84 +249,125 @@ def showIm(arr,returnIm=False):
     else:
         imnew.show()
 
-def estimateLocations(arr,nx,ny,diam=20,windowFrac=0.25,smoothWindow=0.13,showPlt=True,pdf=None):
-    '''Automatically search for best estimate for location of culture array (based on culture centres, not top-left corner).'''
-    # Generate windowed mean intensities, scanning along x and y axes
-    window=int(round(diam*windowFrac))
-    sumx=numpy.array([numpy.mean(arr[0:arr.shape[0],numpy.max([0,dx-window]):numpy.min([arr.shape[1],dx+window])]) for dx in xrange(0,arr.shape[1])],dtype=numpy.float)
-    sumy=numpy.array([numpy.mean(arr[numpy.max([0,dy-window]):numpy.min([arr.shape[0],dy+window]),0:arr.shape[1]]) for dy in xrange(0,arr.shape[0])],dtype=numpy.float)
-    # Smooth intensities to help eliminate small local maxima
-    sumx=ndimage.gaussian_filter1d(sumx,diam*smoothWindow)
-    sumy=ndimage.gaussian_filter1d(sumy,diam*smoothWindow)
-    # First peak in autocorrelation function is best estimate of distance between spots
-    dx=1+numpy.where(numpy.diff(numpy.sign(numpy.diff(autocor(sumx))))==-2)[0][0]
-    dy=1+numpy.where(numpy.diff(numpy.sign(numpy.diff(autocor(sumy))))==-2)[0][0]
-    # Find all maxima
-    maxx=1+numpy.where(numpy.diff(numpy.sign(numpy.diff(sumx)))==-2)[0]
-    maxy=1+numpy.where(numpy.diff(numpy.sign(numpy.diff(sumy)))==-2)[0]
-    # Find the nspots maxima whose mean intermaximum distance is most internally consistent
-    varx,vary=[],[]
-    for i in xrange(0,len(maxx)-nx+1):
-        varpos=numpy.var(numpy.diff(maxx[i:(i+nx)]))
-        # Small penalty for deviations from centre of image
-        symmpen=10*abs(maxx[i]-(arr.shape[1]-maxx[i+nx-1]))/dx
-        varx.append(varpos+symmpen)
-    for i in xrange(0,len(maxy)-ny+1):
-        # Small penalty for deviations from centre of image
-        varpos=numpy.var(numpy.diff(maxy[i:(i+ny)]))
-        symmpen=10*abs(maxy[i]-(arr.shape[0]-maxy[i+ny-1]))/dy
-        vary.append(varpos+symmpen)
-    candx=maxx[numpy.argmin(varx):(numpy.argmin(varx)+nx)]
-    candy=maxy[numpy.argmin(vary):(numpy.argmin(vary)+ny)]
-    # Update spot sizes based on grid location estimates
-    dx=int(numpy.round(numpy.mean(numpy.diff(candx))))
-    dy=int(numpy.round(numpy.mean(numpy.diff(candy))))
+def sampleArr(arr,pos,svals):
+    '''Sum pixel intensities from arr in a rectangle centred on y,x'''
+    y,x=pos
+    sx,sy=svals
+    minx,miny=max(0,x-sx),max(0,y-sy)
+    maxx,maxy=min(arr.shape[1]-1,x+sx), min(arr.shape[0]-1,y+sy)
+    samp=arr[miny:maxy,minx:maxx].flatten()
+    lsamp=len(samp)
+    if lsamp<sx*sy:
+        samp=numpy.append(samp,numpy.zeros(sx*sy-lsamp))
+    val=numpy.nanmedian(samp)
+    return(val)
+
+def makeGrid(pos0,ny,nx,dy,dx):
+    '''Generate grid coordinates from top left position, grid dimension and gap sizes.'''
+    y0,x0=pos0
+    vecs=[range(ny),range(nx)]
+    gpos=list(itertools.product(*vecs))
+    pos=[(int(round(y0+gp[0]*dy)),int(round(x0+gp[1]*dx))) for gp in gpos]
+    return(pos)
     
+def checkPos(arr,ny,nx,pos0,dy,dx,theta=0,sampfrac=0.1):
+    '''Return sum of pixel intensities in arr around grid points'''
+    sx=int(round(dx*sampfrac))
+    sy=int(round(dy*sampfrac))
+    pos=makeGrid(pos0,ny,nx,dy,dx)
+    vals=[sampleArr(arr,p,(sx,sy)) for p in pos]
+    return(sum(vals))
+
+def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,pdf=None):
+    '''Automatically search for best estimate for location of culture array (based on culture centres, not top-left corner).'''
+    acmean=True
+
+    # Generate windowed mean intensities, scanning along x and y axes
+    # Estimate spot diameter, assuming grid takes up most of the plate
+    diam=min(float(arr.shape[0])/ny,float(arr.shape[1])/nx)
+    window=int(round(diam*windowFrac))
+    sumx=numpy.array([numpy.mean(arr[0:arr.shape[0],numpy.max([0,dx-window]):numpy.min([arr.shape[1],dx+window])]) for dx in range(0,arr.shape[1])],dtype=numpy.float)
+    sumy=numpy.array([numpy.mean(arr[numpy.max([0,dy-window]):numpy.min([arr.shape[0],dy+window]),0:arr.shape[1]]) for dy in range(0,arr.shape[0])],dtype=numpy.float)
+    # Smooth intensities to help eliminate small local maxima
+    sumx=ndimage.gaussian_filter1d(sumx,2.5)
+    sumy=ndimage.gaussian_filter1d(sumy,2.5)
+
+    # First peak in autocorrelation function is best estimate of distance between spots
+    maximay=numpy.where(numpy.diff(numpy.sign(numpy.diff(autocor(sumy))))==-2)[0]
+    maximax=numpy.where(numpy.diff(numpy.sign(numpy.diff(autocor(sumx))))==-2)[0]
+    if acmean:
+        dy=int(round(numpy.mean(numpy.diff(maximay))))
+        dx=int(round(numpy.mean(numpy.diff(maximax))))
+    else:
+        dy=int(round(maximay[0]))
+        dx=int(round(maximax[0]))
+        
+    ry=arr.shape[0]-((ny-1)*dy)
+    rx=arr.shape[1]-((nx-1)*dx)
+
+    checkvecs=[range(ry),range(rx)]
+    checkpos=list(itertools.product(*checkvecs))
+
+    def optfun(x):
+        if(x[0]<0 or x[0]>rx or x[1]<0 or x[1]>ry or x[2]<=0):
+            res=300
+        else:
+            try:
+                res=-1*checkPos(arr,ny,nx,x[0:2],x[2],x[2],sampfrac=0.35)
+            except:
+                res=300
+        return(res)
+
+    def minfun(x):
+        return(op.minimize(optfun,x0=x,method="L-BFGS-B",options={'eps':1.0}))
+
+    #sol=op.basinhopping(optfun,niter=10,x0=(ry/2,rx/2),T=10000,minimizer_kwargs={'method':'L-BFGS-B','options':{'eps':1.0}})
+    sol=op.minimize(optfun,x0=(ry/2,rx/2,(dx+dy)/2),method="L-BFGS-B",options={'eps':1.0})
+
+    ### Rough brute force with optimisation at each point
+    ##ds=5
+    ##yguess,xguess=numpy.linspace(0,ry,ds),numpy.linspace(0,rx,ds)
+    ##guesses=itertools.product(yguess,xguess)
+    ##gsol=[minfun(guess) for guess in guesses]
+    ##fgsol=[sol.fun for sol in gsol]
+    ##indbest=numpy.argmin(fgsol)
+
+    grid=makeGrid(sol.x[0:2],ny,nx,sol.x[2],sol.x[2])
+
+    lgrid=list(zip(*grid))
+    candy=list(set(lgrid[0]))
+    candx=list(set(lgrid[1]))
+    candy.sort()
+    candx.sort()
+
     # Output some plots
     if showPlt:
-        plt.plot(sumx)
+        fig,ax=plt.subplots(2,2,figsize=(15,15))
+        
+        ax[0,0].plot(sumx)
         for cand in candx:
-            plt.axvline(x=cand,linestyle='--',linewidth=0.5,color="black")
-        plt.xlabel('x coordinate (px)')
-        plt.ylabel('Mean Intensity')
-        if pdf!=None:
-            pdf.savefig()
-            plt.close()
-        else:
-            plt.show()
-        plt.plot(autocor(sumx))
-        maxima=numpy.where(numpy.diff(numpy.sign(numpy.diff(autocor(sumx))))==-2)[0]
-        for cand in maxima:
-            plt.axvline(x=cand,linestyle='--',linewidth=0.5,color="black")
-        plt.xlabel('Offset dx (px)')
-        plt.ylabel('Autocorrelation')
-        if pdf!=None:
-            pdf.savefig()
-            plt.close()
-        else:
-            plt.show()
+            ax[0,0].axvline(x=cand,linestyle='--',linewidth=0.5,color="black")
+        ax[0,0].set_xlabel('x coordinate (px)')
+        ax[0,0].set_ylabel('Mean Intensity')
+
+        ax[0,1].plot(autocor(sumx))
+        for cand in maximax:
+            ax[0,1].axvline(x=cand,linestyle='--',linewidth=0.5,color="black")
+        ax[0,1].set_xlabel('Offset dx (px)')
+        ax[0,1].set_ylabel('Autocorrelation')
             
-        plt.plot(sumy)
+        ax[1,0].plot(sumy)
         for cand in candy:
-            plt.axvline(x=cand,linestyle='--',linewidth=0.5,color="black")
-        plt.xlabel('y coordinate (px)')
-        plt.ylabel('Mean Intensity')
-        if pdf!=None:
-            pdf.savefig()
-            plt.close()
-        else:
-            plt.show()
-        plt.plot(autocor(sumy))
-        maxima=numpy.where(numpy.diff(numpy.sign(numpy.diff(autocor(sumy))))==-2)[0]
-        for cand in maxima:
-            plt.axvline(x=cand,linestyle='--',linewidth=0.5,color="black")
-        plt.xlabel('Offset dy (px)')
-        plt.ylabel('Autocorrelation')
-        if pdf!=None:
-            pdf.savefig()
-            plt.close()
-        else:
-            plt.show()
+            ax[1,0].axvline(x=cand,linestyle='--',linewidth=0.5,color="black")
+        ax[1,0].set_xlabel('y coordinate (px)')
+        ax[1,0].set_ylabel('Mean Intensity')
+
+        ax[1,1].plot(autocor(sumy))
+        for cand in maximay:
+            ax[1,1].axvline(x=cand,linestyle='--',linewidth=0.5,color="black")
+        ax[1,1].set_xlabel('Offset dy (px)')
+        ax[1,1].set_ylabel('Autocorrelation')
+        plt.show()
     return((candx,candy,dx,dy))
 
 def initialGuess(intensities,counts):
@@ -351,17 +395,17 @@ def initialGuess(intensities,counts):
     # Mirror curve from 0...mu1 to estimate distribution of first component
     P1=numpy.zeros(len(intensities),dtype=numpy.int)
     halfpeak=counts[0:mu1]
-    for i in xrange(0,mu1):
+    for i in range(0,mu1):
         P1[i]=halfpeak[i]
-    for i in xrange(mu1,len(intensities)):
+    for i in range(mu1,len(intensities)):
         P1[i]=halfpeak[min(len(halfpeak)-1,max(0,2*len(halfpeak)-i))]
 
     # Mirror curve for second peak also
     P2=numpy.zeros(len(intensities),dtype=numpy.int)
     halfpeak=counts[mu2:]
-    for i in xrange(0,mu2):
+    for i in range(0,mu2):
         P2[i]=halfpeak[min(len(halfpeak)-1,mu2-i)]
-    for i in xrange(mu2,len(intensities)):
+    for i in range(mu2,len(intensities)):
         P2[i]=halfpeak[i-mu2]
     
     bindat=pandas.DataFrame(intensities,columns=["intensities"])
@@ -408,7 +452,7 @@ def getRoot(p,ints):
     # Find pairs of points in truncated, filtered intensity list which bracket any roots
     diffs=[numpy.sign(diffFunc(x)) for x in ints]
     switches=[]
-    for i in xrange(1,len(diffs)):
+    for i in range(1,len(diffs)):
         if abs((diffs[i]-diffs[i-1]))==2:
             switches.append((i,i-1))
     # Fine-tune root locations
@@ -477,7 +521,7 @@ def sizeSpots(locations,arr,thresharr,edge,background=0):
     # http://en.wikipedia.org/wiki/Shape_factor_(image_analysis_and_microscopy)#Circularity
     # Calculate area, intensity and trimmed intensity for each spot
     sumInt,sumArea,trim,fMed,bMed,circ,fVar,perim=[],[],[],[],[],[],[],[]
-    for i in xrange(0,len(locations.x.values)):
+    for i in range(0,len(locations.x.values)):
         x,y,rad=locations.x.values[i],locations.y.values[i],int(math.ceil(max(locations.Diameter.values)/2.0))
         tile=arr[max(0,y-rad):min(arr.shape[0],(y+rad+1)),max(0,x-rad):min(arr.shape[1],(x+rad+1))]-background
         threshtile=thresharr[max(0,y-rad):min(arr.shape[0],(y+rad+1)),max(0,x-rad):min(arr.shape[1],(x+rad+1))]
@@ -514,7 +558,7 @@ def getColours(im,locations,thresharr):
     redarr,greenarr,bluearr=numpy.array(red,dtype=numpy.uint8),numpy.array(green,dtype=numpy.uint8),numpy.array(blue,dtype=numpy.uint8)
     r,g,b,rB,gB,bB,rm,gm,bm,rmB,gmB,bmB=[],[],[],[],[],[],[],[],[],[],[],[]
     store=numpy.zeros((len(locations.x.values),12),numpy.float)
-    for i in xrange(0,len(locations.x.values)):
+    for i in range(0,len(locations.x.values)):
         x,y,rad=locations.x.values[i],locations.y.values[i],int(math.ceil(max(locations.Diameter.values)/2.0))
         redtile=redarr[y-rad:(y+rad+1),x-rad:(x+rad+1)]
         greentile=greenarr[y-rad:(y+rad+1),x-rad:(x+rad+1)]
@@ -572,7 +616,8 @@ def setupDirectories(dictlist,verbose=False):
     '''Create output directories and return paths for writing/reading files'''
     if isinstance(dictlist,dict):
         # Flatten dictionary to list:
-        dictlist= [x for d in dictlist.itervalues() for x in d]
+        # dictlist= [x for d in dictlist.itervalues() for x in d] # Python 2.7
+        dictlist= [x for d in dictlist.values() for x in d] 
     # Else assume a list
 
     # Get unique set of directories in list:
@@ -690,7 +735,7 @@ def locateCultures(candx,candy,dx,dy,arrN,search=0.4,radFrac=1.0,mkPlots=False,u
 		delta=int(round((radius-rad)/2.0))
 		rad=int(round(rad))
 		RAD=int(round(search*radius))
-		for i in xrange(0,len(locations.x)):
+		for i in range(0,len(locations.x)):
 				(x,y)=optimiseSpot(arrN,locations.x[i]+delta,locations.y[i]+delta,rad,RAD,mkPlots)
 				# Note this returns coordinates of CENTRE OF SPOT
 				locations.x[i]=int(round(x-delta+dx/2.0))
@@ -728,10 +773,9 @@ def maskAndFill(arrN,finalMask,tol=5):
         # Invert filling order at every pass to minimise bias towards a particular direction
         x_list=x_list[::-1]
         y_list=y_list[::-1]
-        print diff>tol, numpy.isnan(diff)
         old=numpy.copy(cutout_arr)
         # Markov field update
-        for i in xrange(0,len(x_list)):
+        for i in range(0,len(x_list)):
             plist=[cutout_arr[y_list[i],x_list[i]+1],cutout_arr[y_list[i]+1,x_list[i]],cutout_arr[y_list[i],x_list[i]-1],cutout_arr[y_list[i]-1,x_list[i]]]
             cutout_arr[y_list[i],x_list[i]]=stats.nanmean(plist)
         diff=numpy.sum(numpy.abs(old-cutout_arr))/numpy.sum(finalMask)
@@ -760,7 +804,7 @@ def threshPreview(arr,thresh1,locations):
     imthresh=thresholdArr(numpy.copy(arr),thresh1).convert("RGB")
     draw=ImageDraw.Draw(imthresh)
     colours=((255,0,0),(0,255,0),(0,0,255),(255,255,0),(0,255,255),(255,0,255))
-    for i in xrange(0,len(locations.x)):
+    for i in range(0,len(locations.x)):
         x,y,r=int(round(locations.x[i])),int(round(locations.y[i])),int(round(float(locations.Diameter[i])/2.0))
         draw.rectangle((x-r,y-r,x+r,y+r),outline=colours[i%5])
     return(imthresh)
@@ -817,19 +861,19 @@ def pad(x,zeros=2):
 
 def viewerSummary(res):
     '''Generate report to help building vertical and horizontal categories for image viewer'''   
-    print "Data summary"
-    print "~~~~~~~~~~~~"
-    print "Barcode: "+str(len(res["Barcode"].unique()))
-    print "Library Plates: "+str(len(res["MasterPlate.Number"].unique()))
-    print "SGA replicate plates: "+str(len(res["RepQuad"].unique()))
-    print "Screen identifiers: "+str(len(res["Screen.Name"].unique()))+"("+",".join([str(x) for x in res["Screen.Name"].unique()])+")"
+    print ("Data summary")
+    print ("~~~~~~~~~~~~")
+    print ("Barcode: "+str(len(res["Barcode"].unique())))
+    print ("Library Plates: "+str(len(res["MasterPlate.Number"].unique())))
+    print ("SGA replicate plates: "+str(len(res["RepQuad"].unique())))
+    print ("Screen identifiers: "+str(len(res["Screen.Name"].unique()))+"("+",".join([str(x) for x in res["Screen.Name"].unique()])+")")
     if "ScreenID" in res.columns:
-        print "Screen IDs: "+str(len(res["ScreenID"].unique()))+"("+",".join([str(x) for x in res["ScreenID"].unique()])+")"
-    print "Libraries: "+str(len(res["Library.Name"].unique()))+"("+",".join([str(x) for x in res["Library.Name"].unique()])+")"
-    print "Treatment: "+str(len(res["Treatment"].unique()))+"("+",".join([str(x) for x in res["Treatment"].unique()])+")"
-    print "Medium: "+str(len(res["Medium"].unique()))+"("+",".join([str(x) for x in res["Medium"].unique()])+")"
-    print "TreatMed: "+str(len(res["TreatMed"].unique()))+"("+",".join([str(x) for x in res["TreatMed"].unique()])+")"
-    print ""
+        print ("Screen IDs: "+str(len(res["ScreenID"].unique()))+"("+",".join([str(x) for x in res["ScreenID"].unique()])+")")
+    print ("Libraries: "+str(len(res["Library.Name"].unique()))+"("+",".join([str(x) for x in res["Library.Name"].unique()])+")")
+    print ("Treatment: "+str(len(res["Treatment"].unique()))+"("+",".join([str(x) for x in res["Treatment"].unique()])+")")
+    print ("Medium: "+str(len(res["Medium"].unique()))+"("+",".join([str(x) for x in res["Medium"].unique()])+")")
+    print ("TreatMed: "+str(len(res["TreatMed"].unique()))+"("+",".join([str(x) for x in res["TreatMed"].unique()])+")")
+    print ("")
 
 def getDate(x,fmt="%Y-%m-%d_%H-%M-%S"):
     try:
@@ -897,7 +941,7 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
         h.sort("vertID",inplace=True)
     res=hSplit[0]
     if len(hSplit)>1:
-        for i in xrange(1,len(hSplit)):
+        for i in range(1,len(hSplit)):
             res=res.append(hSplit[i])
 
     All_IDs.append("Replicate")
@@ -1039,7 +1083,7 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
                     inputs=(int(round(dRow["tlx"])),int(round(dRow["tly"])),int(round(dRow["brx"])),int(round(dRow["bry"])),dRow["Gene"],dRow["ORF"])
                     mapString+='<area shape="rect" coords="%i,%i,%i,%i" title="%s" href="http://www.yeastgenome.org/cgi-bin/locus.fpl?locus=%s" alt=""/>\n'%inputs
                     if dRow["fit"]>hitThresh:
-                            for d in xrange(0,1):
+                            for d in range(0,1):
                                 draw.rectangle((int(round(dRow["tlx"]*scl))-d,int(round(dRow["tly"]*scl))-d,int(round(dRow["brx"]*scl))+d,int(round(dRow["bry"]*scl))+d),outline="white")
                     if dRow["fit"]<deadThresh:
                             cx=int(round((dRow["tlx"]+dRow["brx"])*scl/2.0))
@@ -1048,7 +1092,7 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
                             draw.rectangle((cx-r,cy-r,cx+r,cy+r),fill="white")
                     for colour in highlight:
                         if str(dRow["Gene"]).upper() in highlight[colour]:
-                            for d in xrange(0,3):
+                            for d in range(0,3):
                                 draw.rectangle((int(round(dRow["tlx"]*scl))-d,int(round(dRow["tly"]*scl))-d,int(round(dRow["brx"]*scl))+d,int(round(dRow["bry"]*scl))+d),outline=colour)
                                 
                 inputs=(col*smw,row*smh,(col+1)*smw,(row+1)*smh,str(horiz[col])+"#"+str(dat["vID"].iloc[0])+str(dat["Barcode"].iloc[0]))

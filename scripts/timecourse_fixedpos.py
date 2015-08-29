@@ -6,7 +6,9 @@ import string
 import os
 import time
 import numpy
+import itertools
 from matplotlib.backends.backend_pdf import PdfPages
+
 
 def checkImages(fdir,fdict=None,barcRange=(0,-24),verbose=False):
     '''Discover barcodes in current working directory (or in fdir or in those specified in fdict) for which analysis has not started.'''
@@ -103,8 +105,9 @@ def locateJSON(scrID,dirHTS='.',verbose=False):
 
 def prepareTimecourse(barcdict,verbose=False):
     '''In timecourse mode, prepares "next" batch of images for analysis from dictionary of image names (unique image barcodes are dictionary keys).'''
-    BARCs=barcdict.keys()
-    BARCs.sort()
+    #BARCs=barcdict.keys()
+    #BARCs.sort()
+    BARCs=sorted(barcdict)
     BARCODE=BARCs[0]
     imdir=os.path.dirname(barcdict[BARCODE][0])
     InsData=c2.readInstructions(imdir)
@@ -156,7 +159,7 @@ def main(inp="",verbose=False):
 
     cutFromFirst=False
     cythonFill=False
-    updateLocations=True
+    updateLocations=False
 
     var=buildVars(verbose=verbose,inp=inp)
     correction,fixedThresh,threshplots,initpos,fdict,fdir,nrow,ncol=(var["lc"],var["fixedThresh"],var["threshplots"],var["initpos"],var["fdict"],var["fdir"],var["nrow"],var["ncol"])
@@ -181,8 +184,7 @@ def main(inp="",verbose=False):
             (candx,candy,dx,dy)=loadLocationGuesses(LATESTIMAGE,InsData)
         else:
             # Automatically generate guesses for gridded array locations
-            diam=int(1.05*round(min(float(arrN.shape[0])/(nrow+1),float(arrN.shape[1])/(ncol+1))))
-            (candx,candy,dx,dy)=c2.estimateLocations(arrN,ncol,nrow,diam,showPlt=True)
+            (candx,candy,dx,dy)=c2.estimateLocations(arrN,ncol,nrow,showPlt=True)
 
         # Update guesses and initialise locations data frame
         locationsN=c2.locateCultures([int(round(cx-dx/2.0)) for cx in candx],[int(round(cy-dy/2.0)) for cy in candy],dx,dy,arrN,update=updateLocations,mkPlots=False)
