@@ -25,7 +25,7 @@ dy=1+numpy.where(numpy.diff(numpy.sign(numpy.diff(autocor(sumy))))==-2)[0][0]
 
 def sampleArr(arr,pos,svals):
     '''Sum pixel intensities from arr in a rectangle centred on y,x'''
-    x,y=pos
+    y,x=pos
     sx,sy=svals
     minx,miny=max(0,x-sx),max(0,y-sy)
     maxx,maxy=min(arr.shape[1]-1,x+sx), min(arr.shape[0]-1,y+sy)

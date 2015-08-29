@@ -18,15 +18,15 @@ def main():
     fixedThresh=0
     if len(sys.argv)>1:
         if '--nolc' in sys.argv:
-            print "No lighting correction..."
+            print ("No lighting correction...")
             correction=False
         if '--fixthresh' in sys.argv:
             ind=sys.argv.index('--fixthresh')+1
             fixedThresh=float(sys.argv[ind])
-            print "Using fixed threshold "+str(fixedThresh)
+            print ("Using fixed threshold "+str(fixedThresh))
         if'--threshplots' in sys.argv:
             threshplots=True
-            print "Plotting pixel intensity distributions"
+            print ("Plotting pixel intensity distributions")
 
     while len(imList)>0:
         imName=imList[0]

@@ -1,5 +1,4 @@
 from setuptools import setup, find_packages
-from Cython.Build import cythonize
 import numpy
 import os
 import subprocess
@@ -38,6 +37,14 @@ f.close()
 # Nice tutorial on packaging python code:
 # http://www.scotttorborg.com/python-packaging/
 
+try:
+    from Cython.Distutils import build_ext
+except ImportError:
+    ext_modules=[]
+else:
+    from Cython.Build import cythonize
+    ext_modules=cythonize("colonyzer2/maskfill.pyx")
+
 setup(name='Colonyzer2',
       version=version,
       packages=['colonyzer2','scripts'],
@@ -56,6 +63,6 @@ setup(name='Colonyzer2',
         'Intended Audience :: Science/Research'
         ],
       install_requires=['numpy','scipy','pandas','matplotlib','pillow'],
-      ext_modules=cythonize("colonyzer2/maskfill.pyx"),
+      ext_modules=ext_modules,
       include_dirs=[numpy.get_include()]
       )

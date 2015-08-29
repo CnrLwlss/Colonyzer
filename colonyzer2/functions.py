@@ -58,7 +58,7 @@ def parsePlateFormat(fmt):
         norows,nocols = int(tmp[0]),int(tmp[1])
     else:
         nocols,norows=0,0
-        print "WARNING: Incorrect rectangular grid format specified!"
+        print ("WARNING: Incorrect rectangular grid format specified!")
         
     return((norows,nocols))
 
