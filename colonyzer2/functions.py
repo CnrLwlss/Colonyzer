@@ -721,48 +721,61 @@ def openImage(imName):
     arrN=numpy.array(img,dtype=numpy.float)
     return(im,arrN)
 
-##def locateCultures(candx,candy,dx,dy,arrN,nx,ny,search=0.4,radFrac=1.0,mkPlots=False,update=True):
-##    '''Starting with initial guesses for culture locations (top left corner), optimise individual culture locations and return locations (centre of spots) data frame.'''
-##    # radius is half width of spot tile, rad is "radius" of area tested for brightness (0<radnum<=1.0), RAD is half width of search space
-##    cols,rows=numpy.meshgrid(numpy.arange(1,nx+1),numpy.arange(1,ny+1))
-##    d={"Row":rows.flatten(),"Column":cols.flatten(),"y":candy,"x":candx}
-##    locations=pandas.DataFrame(d)
-##    locations["Diameter"]=min(dx,dy)
-##    if update:
-##        radius=float(min(dx,dy))/2.0
-##        rad=radFrac*radius
-##        delta=int(round((radius-rad)/2.0))
-##        rad=int(round(rad))
-##        RAD=int(round(search*radius))
-##        for i in range(0,len(locations.x)):
-##            (x,y)=optimiseSpot(arrN,locations.x[i]+delta,locations.y[i]+delta,rad,RAD,mkPlots)
-##            # Note this returns coordinates of CENTRE OF SPOT
-##            locations.x[i]=int(round(x-delta+dx/2.0))
-##            locations.y[i]=int(round(y-delta+dy/2.0))
-##        print("Cultures located")
-##    else:
-##        locations.x=locations.x+dx/2.0
-##        locations.y=locations.y+dy/2.0
-##    return(locations)
-
-def locateCultures(candx,candy,dx,dy,arrN,nx,ny,update=True):
+def locateCulturesScan(candx,candy,dx,dy,arrN,nx,ny,search=0.4,radFrac=1.0,mkPlots=False,update=True):
+    '''Starting with initial guesses for culture locations (top left corner), optimise individual culture locations and return locations (centre of spots) data frame.'''
+    # radius is half width of spot tile, rad is "radius" of area tested for brightness (0<radnum<=1.0), RAD is half width of search space
     cols,rows=numpy.meshgrid(numpy.arange(1,nx+1),numpy.arange(1,ny+1))
     d={"Row":rows.flatten(),"Column":cols.flatten(),"y":candy,"x":candx}
     locations=pandas.DataFrame(d)
     locations["Diameter"]=min(dx,dy)
     if update:
+        radius=float(min(dx,dy))/2.0
+        rad=radFrac*radius
+        delta=int(round((radius-rad)/2.0))
+        rad=int(round(rad))
+        RAD=int(round(search*radius))
         for i in range(0,len(locations.x)):
-            COM=(int(round(locations.y+dy/2.0)),int(round(locations.x+dx/2.0)))
-            print(COM+" round 0")
-            for counter in range(5):
-                # Get centre of mass
-                COM=ndimage.measurements.center_of_mass(arr[locations.y[i]:(locations.y[i]+dy),locations.x[i]:(locations.x[i]+dx)])
-                locations.y[i]=int(round(COM[0]-dy/2.0))
-                locations.x[i]=int(round(COM[0]-dx/2.0))
-                print(COM+" round "+str(counter))
+            (x,y)=optimiseSpot(arrN,locations.x[i]+delta,locations.y[i]+delta,rad,RAD,mkPlots)
+            # Note this returns coordinates of CENTRE OF SPOT
+            locations.x[i]=int(round(x-delta+dx/2.0))
+            locations.y[i]=int(round(y-delta+dy/2.0))
+        print("Cultures located")
     else:
         locations.x=locations.x+dx/2.0
         locations.y=locations.y+dy/2.0
+    return(locations)
+
+def locateCultures(candx,candy,dx,dy,arr,nx,ny,mkPlots=False,update=True,maxupdates=10):
+    '''Recursively calculate centre of mass for each tile until it converges (or reaches maxupdates).'''
+    cols,rows=numpy.meshgrid(numpy.arange(1,nx+1),numpy.arange(1,ny+1))
+    cx=list(candx)
+    cy=list(candy)
+    dx=int(round(dx))
+    dy=int(round(dy))
+
+    if update:
+        for i in range(0,len(cx)):
+            edgesum0=sum(arr[cy[i]:(cy[i]+dy),cx[i]])+sum(arr[cy[i]:(cy[i]+dy),cx[i]+dx])+sum(arr[cy[i],(cx[i]+1):(cx[i]+dx-1)])+sum(arr[cy[i]+dy,(cx[i]+1):(cx[i]+dx-1)])
+            cy0,cx0=cy[i],cx[i]
+            COM0=(int(round(cy[i]+dy/2.0)),int(round(cx[i]+dx/2.0)))
+            counter=0
+            # Get centre of mass
+            COM=ndimage.measurements.center_of_mass(arr[cy[i]:(cy[i]+dy),cx[i]:(cx[i]+dx)])
+            while COM != COM0 and counter<maxupdates:
+                cy[i]=int(round(cy[i]+COM[0]-dy/2.0))
+                cx[i]=int(round(cx[i]+COM[1]-dx/2.0))
+                COM0=COM
+                COM=ndimage.measurements.center_of_mass(arr[cy[i]:(cy[i]+dy),cx[i]:(cx[i]+dx)])
+                counter+=1
+            edgesum=sum(arr[cy[i]:(cy[i]+dy),cx[i]])+sum(arr[cy[i]:(cy[i]+dy),cx[i]+dx])+sum(arr[cy[i],(cx[i]+1):(cx[i]+dx-1)])+sum(arr[cy[i]+dy,(cx[i]+1):(cx[i]+dx-1)])
+            # If there's more culture on the edge of the tile after update, revert to original guess
+            if edgesum>edgesum0:
+                cy[i]=cy0
+                cx[i]=cx0
+
+    d={"Row":rows.flatten(),"Column":cols.flatten(),"y":[cyv+dy/2.0 for cyv in cy],"x":[cxv+dx/2.0 for cxv in cx]}
+    locations=pandas.DataFrame(d)
+    locations["Diameter"]=min(dx,dy)
     return(locations)
 
 def makeMask(arrN,thresh1,tol=5):
