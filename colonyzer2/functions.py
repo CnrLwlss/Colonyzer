@@ -262,19 +262,25 @@ def sampleArr(arr,pos,svals):
     val=numpy.nanmedian(samp)
     return(val)
 
-def makeGrid(pos0,ny,nx,dy,dx):
-    '''Generate grid coordinates from top left position, grid dimension and gap sizes.'''
+def makeGrid(pos0,ny,nx,dy,dx,theta=0):
+    '''Generate grid coordinates from top left position, grid dimension gap sizes and angle (rotation about top left).'''
     y0,x0=pos0
+    rads=2*math.pi*theta/360.0
+    s=math.sin(-rads)
+    c=math.cos(-rads)
     vecs=[range(ny),range(nx)]
     gpos=list(itertools.product(*vecs))
-    pos=[(int(round(y0+gp[0]*dy)),int(round(x0+gp[1]*dx))) for gp in gpos]
-    return(pos)
+    pos=[(y0+gp[0]*dy,x0+gp[1]*dx) for gp in gpos]
+    post=[(p[0]-pos[0][0],p[1]-pos[0][1]) for p in pos]
+    posr=[(p[1]*s+p[0]*c,p[1]*c-p[0]*s) for p in post]
+    posf=[(int(round(p[0]+pos[0][0])),int(round(p[1]+pos[0][1]))) for p in posr]
+    return(posf)
     
 def checkPos(arr,ny,nx,pos0,dy,dx,theta=0,sampfrac=0.1):
     '''Return sum of pixel intensities in arr around grid points'''
     sx=int(round(dx*sampfrac))
     sy=int(round(dy*sampfrac))
-    pos=makeGrid(pos0,ny,nx,dy,dx)
+    pos=makeGrid(pos0,ny,nx,dy,dx,theta)
     vals=[sampleArr(arr,p,(sx,sy)) for p in pos]
     return(sum(vals))
 
@@ -313,32 +319,28 @@ def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,p
             res=300
         else:
             try:
-                res=-1*checkPos(arr,ny,nx,x[0:2],x[2],x[2],sampfrac=0.35)
+                res=-1*checkPos(arr,ny,nx,x[0:2],dx=x[2],dy=x[2],theta=x[3],sampfrac=0.35)
             except:
                 res=300
         return(res)
 
-    def minfun(x):
-        return(op.minimize(optfun,x0=x,method="L-BFGS-B",options={'eps':1.0}))
+    sol=op.minimize(optfun,x0=(ry/2,rx/2,(dx+dy)/2,0),method="L-BFGS-B",options={'eps':[1.0,1.0,1.0,0.05]})
+    pos0=sol.x[0:2]
+    dx,dy=sol.x[2],sol.x[2]    
 
-    #sol=op.basinhopping(optfun,niter=10,x0=(ry/2,rx/2),T=10000,minimizer_kwargs={'method':'L-BFGS-B','options':{'eps':1.0}})
-    sol=op.minimize(optfun,x0=(ry/2,rx/2,(dx+dy)/2),method="L-BFGS-B",options={'eps':1.0})
+    if len(sol.x)==4:
+        theta=sol.x[3]
+    else:
+        theta=0
+    grid=makeGrid(pos0,ny,nx,dy=dy,dx=dx,theta=theta)
 
-    ### Rough brute force with optimisation at each point
-    ##ds=5
-    ##yguess,xguess=numpy.linspace(0,ry,ds),numpy.linspace(0,rx,ds)
-    ##guesses=itertools.product(yguess,xguess)
-    ##gsol=[minfun(guess) for guess in guesses]
-    ##fgsol=[sol.fun for sol in gsol]
-    ##indbest=numpy.argmin(fgsol)
+##    lgrid=list(zip(*grid))
+##    candy=list(set(lgrid[0]))
+##    candx=list(set(lgrid[1]))
+##    candy.sort()
+##    candx.sort()
 
-    grid=makeGrid(sol.x[0:2],ny,nx,sol.x[2],sol.x[2])
-
-    lgrid=list(zip(*grid))
-    candy=list(set(lgrid[0]))
-    candx=list(set(lgrid[1]))
-    candy.sort()
-    candx.sort()
+    candy,candx=list(zip(*grid))
 
     # Output some plots
     if showPlt:
@@ -719,32 +721,49 @@ def openImage(imName):
     arrN=numpy.array(img,dtype=numpy.float)
     return(im,arrN)
 
-def locateCultures(candx,candy,dx,dy,arrN,search=0.4,radFrac=1.0,mkPlots=False,update=True):
-	'''Starting with initial guesses for culture locations (top left corner), optimise individual culture locations and return locations (centre of spots) data frame.'''
-	# radius is half width of spot tile, rad is "radius" of area tested for brightness (0<radnum<=1.0), RAD is half width of search space
-	nx,ny=len(candx),len(candy)
-	diam=int(1.05*round(min(float(arrN.shape[0])/(ny+1),float(arrN.shape[1])/(nx+1))))
-	xloc,yloc=numpy.meshgrid(candx,candy)
-	cols,rows=numpy.meshgrid(numpy.arange(1,nx+1),numpy.arange(1,ny+1))
-	d={"Row":rows.flatten(),"Column":cols.flatten(),"y":yloc.flatten(),"x":xloc.flatten()}
-	locations=pandas.DataFrame(d)
-	locations["Diameter"]=min(dx,dy)
-	if update:
-		radius=float(min(dx,dy))/2.0
-		rad=radFrac*radius
-		delta=int(round((radius-rad)/2.0))
-		rad=int(round(rad))
-		RAD=int(round(search*radius))
-		for i in range(0,len(locations.x)):
-				(x,y)=optimiseSpot(arrN,locations.x[i]+delta,locations.y[i]+delta,rad,RAD,mkPlots)
-				# Note this returns coordinates of CENTRE OF SPOT
-				locations.x[i]=int(round(x-delta+dx/2.0))
-				locations.y[i]=int(round(y-delta+dy/2.0))
-		print("Cultures located")
-	else:
-		locations.x=locations.x+dx/2.0
-		locations.y=locations.y+dy/2.0
-	return(locations)
+##def locateCultures(candx,candy,dx,dy,arrN,nx,ny,search=0.4,radFrac=1.0,mkPlots=False,update=True):
+##    '''Starting with initial guesses for culture locations (top left corner), optimise individual culture locations and return locations (centre of spots) data frame.'''
+##    # radius is half width of spot tile, rad is "radius" of area tested for brightness (0<radnum<=1.0), RAD is half width of search space
+##    cols,rows=numpy.meshgrid(numpy.arange(1,nx+1),numpy.arange(1,ny+1))
+##    d={"Row":rows.flatten(),"Column":cols.flatten(),"y":candy,"x":candx}
+##    locations=pandas.DataFrame(d)
+##    locations["Diameter"]=min(dx,dy)
+##    if update:
+##        radius=float(min(dx,dy))/2.0
+##        rad=radFrac*radius
+##        delta=int(round((radius-rad)/2.0))
+##        rad=int(round(rad))
+##        RAD=int(round(search*radius))
+##        for i in range(0,len(locations.x)):
+##            (x,y)=optimiseSpot(arrN,locations.x[i]+delta,locations.y[i]+delta,rad,RAD,mkPlots)
+##            # Note this returns coordinates of CENTRE OF SPOT
+##            locations.x[i]=int(round(x-delta+dx/2.0))
+##            locations.y[i]=int(round(y-delta+dy/2.0))
+##        print("Cultures located")
+##    else:
+##        locations.x=locations.x+dx/2.0
+##        locations.y=locations.y+dy/2.0
+##    return(locations)
+
+def locateCultures(candx,candy,dx,dy,arrN,nx,ny,update=True):
+    cols,rows=numpy.meshgrid(numpy.arange(1,nx+1),numpy.arange(1,ny+1))
+    d={"Row":rows.flatten(),"Column":cols.flatten(),"y":candy,"x":candx}
+    locations=pandas.DataFrame(d)
+    locations["Diameter"]=min(dx,dy)
+    if update:
+        for i in range(0,len(locations.x)):
+            COM=(int(round(locations.y+dy/2.0)),int(round(locations.x+dx/2.0)))
+            print(COM+" round 0")
+            for counter in range(5):
+                # Get centre of mass
+                COM=ndimage.measurements.center_of_mass(arr[locations.y[i]:(locations.y[i]+dy),locations.x[i]:(locations.x[i]+dx)])
+                locations.y[i]=int(round(COM[0]-dy/2.0))
+                locations.x[i]=int(round(COM[0]-dx/2.0))
+                print(COM+" round "+str(counter))
+    else:
+        locations.x=locations.x+dx/2.0
+        locations.y=locations.y+dy/2.0
+    return(locations)
 
 def makeMask(arrN,thresh1,tol=5):
     '''Generate an agar mask and a pseudo-empty image from a plate with obvious cultures.  Cultures are identified by thresholding, cut out and filled using a Markov field update.'''

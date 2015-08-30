@@ -153,112 +153,114 @@ def edgeFill(arr,locations,cutoff=0.8):
     maskN=ndimage.morphology.binary_erosion(fillN,iterations=7)
     return(maskN)
 
+verbose=True
+inp="-d ../Auxiliary/Data -c -t -o 384"
 
-def main(inp="",verbose=False):
-    print("Colonyzer "+c2.__version__)
+#def main(inp="",verbose=False):
+print("Colonyzer "+c2.__version__)
 
-    cutFromFirst=False
-    cythonFill=False
-    updateLocations=False
+cutFromFirst=False
+cythonFill=False
+updateLocations=True
 
-    var=buildVars(verbose=verbose,inp=inp)
-    correction,fixedThresh,threshplots,initpos,fdict,fdir,nrow,ncol=(var["lc"],var["fixedThresh"],var["threshplots"],var["initpos"],var["fdict"],var["fdir"],var["nrow"],var["ncol"])
-    barcdict=checkImages(fdir,fdict,verbose=verbose)
-    rept=c2.setupDirectories(barcdict,verbose=verbose)
+var=buildVars(verbose=verbose,inp=inp)
+correction,fixedThresh,threshplots,initpos,fdict,fdir,nrow,ncol=(var["lc"],var["fixedThresh"],var["threshplots"],var["initpos"],var["fdict"],var["fdir"],var["nrow"],var["ncol"])
+barcdict=checkImages(fdir,fdict,verbose=verbose)
+rept=c2.setupDirectories(barcdict,verbose=verbose)
 
-    start=time.time()
+start=time.time()
 
-    while len(barcdict)>0:
-        BARCODE,imdir,InsData,LATESTIMAGE,EARLIESTIMAGE,imRoot=prepareTimecourse(barcdict,verbose=verbose)  
-       
-        # Create empty file to indicate that barcode is currently being analysed, to allow parallel analysis (lock files)
-        tmp=open(os.path.join(os.path.dirname(EARLIESTIMAGE),"Output_Data",os.path.basename(EARLIESTIMAGE).split(".")[0]+".out"),"w").close()
+while len(barcdict)>0:
+    BARCODE,imdir,InsData,LATESTIMAGE,EARLIESTIMAGE,imRoot=prepareTimecourse(barcdict,verbose=verbose)  
+   
+    # Create empty file to indicate that barcode is currently being analysed, to allow parallel analysis (lock files)
+    tmp=open(os.path.join(os.path.dirname(EARLIESTIMAGE),"Output_Data",os.path.basename(EARLIESTIMAGE).split(".")[0]+".out"),"w").close()
 
-        # Get latest image for thresholding and detecting culture locations
-        imN,arrN=c2.openImage(LATESTIMAGE)
-        # Get earliest image for lighting gradient correction
-        im0,arr0=c2.openImage(EARLIESTIMAGE)
+    # Get latest image for thresholding and detecting culture locations
+    imN,arrN=c2.openImage(LATESTIMAGE)
+    # Get earliest image for lighting gradient correction
+    im0,arr0=c2.openImage(EARLIESTIMAGE)
 
-        if initpos:
-            # Load initial guesses from Colonyzer.txt file
-            (candx,candy,dx,dy)=loadLocationGuesses(LATESTIMAGE,InsData)
+    if initpos:
+        # Load initial guesses from Colonyzer.txt file
+        (candx,candy,dx,dy)=loadLocationGuesses(LATESTIMAGE,InsData)
+    else:
+        # Automatically generate guesses for gridded array locations
+        (candx,candy,dx,dy)=c2.estimateLocations(arrN,ncol,nrow,showPlt=True)
+
+    # Update guesses and initialise locations data frame
+    locationsN=c2.locateCultures([int(round(cx-dx/2.0)) for cx in candx],[int(round(cy-dy/2.0)) for cy in candy],dx,dy,arrN,ncol,nrow,update=updateLocations,mkPlots=False)
+
+    if cutFromFirst:
+        mask=edgeFill(arr0,locationsN,0.8)
+        startFill=time.time()
+        if cythonFill:
+            pseudoempty=maskAndFillCython(arr0,maskN,0.005)
+            print("Inpainting using Cython & NumPy: "+str(time.time()-startFill)+" s")
         else:
-            # Automatically generate guesses for gridded array locations
-            (candx,candy,dx,dy)=c2.estimateLocations(arrN,ncol,nrow,showPlt=True)
-
-        # Update guesses and initialise locations data frame
-        locationsN=c2.locateCultures([int(round(cx-dx/2.0)) for cx in candx],[int(round(cy-dy/2.0)) for cy in candy],dx,dy,arrN,update=updateLocations,mkPlots=False)
-
-        if cutFromFirst:
-            mask=edgeFill(arr0,locationsN,0.8)
-            startFill=time.time()
-            if cythonFill:
-                pseudoempty=maskAndFillCython(arr0,maskN,0.005)
-                print("Inpainting using Cython & NumPy: "+str(time.time()-startFill)+" s")
-            else:
-                pseudoempty=maskAndFill(arr0,mask,0.005)
-                print("Inpainting using NumPy: "+str(time.time()-start)+" s")
-        else:
-            pseudoempty=arr0
-            
-        # Smooth (pseudo-)empty image 
-        (correction_map,average_back)=c2.makeCorrectionMap(pseudoempty,locationsN,verbose=verbose)
-
-        # Correct spatial gradient in final image
-        corrected_arrN=arrN*correction_map
-
-        # Trim outer part of image to remove plate walls
-        trimmed_arrN=arrN[max(0,int(round(min(locationsN.y)-dy/2.0))):min(arrN.shape[0],int(round((max(locationsN.y)+dy/2.0)))),max(0,int(round(min(locationsN.x)-dx/2.0))):min(arrN.shape[1],int(round((max(locationsN.x)+dx/2.0))))]
+            pseudoempty=maskAndFill(arr0,mask,0.005)
+            print("Inpainting using NumPy: "+str(time.time()-start)+" s")
+    else:
+        pseudoempty=arr0
         
-        if fixedThresh>=0:
-            thresh=fixedThresh
+    # Smooth (pseudo-)empty image 
+    (correction_map,average_back)=c2.makeCorrectionMap(pseudoempty,locationsN,verbose=verbose)
+
+    # Correct spatial gradient in final image
+    corrected_arrN=arrN*correction_map
+
+    # Trim outer part of image to remove plate walls
+    trimmed_arrN=arrN[max(0,int(round(min(locationsN.y)-dy/2.0))):min(arrN.shape[0],int(round((max(locationsN.y)+dy/2.0)))),max(0,int(round(min(locationsN.x)-dx/2.0))):min(arrN.shape[1],int(round((max(locationsN.x)+dx/2.0))))]
+    
+    if fixedThresh>=0:
+        thresh=fixedThresh
+    else:
+        if threshplots:
+            pdf=PdfPages(BARCODE+'_HistogramReport.pdf')
+            (thresh,bindat)=c2.automaticThreshold(trimmed_arrN,BARCODE,pdf)
+            c2.plotModel(bindat,label=BARCODE,pdf=pdf)
+            pdf.close()
         else:
-            if threshplots:
-                pdf=PdfPages(BARCODE+'_HistogramReport.pdf')
-                (thresh,bindat)=c2.automaticThreshold(trimmed_arrN,BARCODE,pdf)
-                c2.plotModel(bindat,label=BARCODE,pdf=pdf)
-                pdf.close()
-            else:
-                (thresh,bindat)=c2.automaticThreshold(trimmed_arrN)
+            (thresh,bindat)=c2.automaticThreshold(trimmed_arrN)
 
-        # Mask for identifying culture areas
-        maskN=numpy.ones(arrN.shape,dtype=numpy.bool)
-        maskN[arrN<thresh]=False
+    # Mask for identifying culture areas
+    maskN=numpy.ones(arrN.shape,dtype=numpy.bool)
+    maskN[arrN<thresh]=False
 
-        for FILENAME in barcdict[BARCODE]:
-            im,arr=c2.openImage(FILENAME)
-            if correction:
-                arr=arr*correction_map
-            
-            # Correct for lighting differences between plates
-            arrsm=arr[max(0,int(round(min(locationsN.y)-dy/2.0))):min(arrN.shape[0],int(round((max(locationsN.y)+dy/2.0)))),max(0,int(round(min(locationsN.x)-dx/2.0))):min(arrN.shape[1],int(round((max(locationsN.x)+dx/2.0))))]
-            masksm=maskN[max(0,int(round(min(locationsN.y)-dy/2.0))):min(arrN.shape[0],int(round((max(locationsN.y)+dy/2.0)))),max(0,int(round(min(locationsN.x)-dx/2.0))):min(arrN.shape[1],int(round((max(locationsN.x)+dx/2.0))))]
-            meanPx=numpy.mean(arrsm[numpy.logical_not(masksm)])
+    for FILENAME in barcdict[BARCODE]:
+        im,arr=c2.openImage(FILENAME)
+        if correction:
+            arr=arr*correction_map
+        
+        # Correct for lighting differences between plates
+        arrsm=arr[max(0,int(round(min(locationsN.y)-dy/2.0))):min(arrN.shape[0],int(round((max(locationsN.y)+dy/2.0)))),max(0,int(round(min(locationsN.x)-dx/2.0))):min(arrN.shape[1],int(round((max(locationsN.x)+dx/2.0))))]
+        masksm=maskN[max(0,int(round(min(locationsN.y)-dy/2.0))):min(arrN.shape[0],int(round((max(locationsN.y)+dy/2.0)))),max(0,int(round(min(locationsN.x)-dx/2.0))):min(arrN.shape[1],int(round((max(locationsN.x)+dx/2.0))))]
+        meanPx=numpy.mean(arrsm[numpy.logical_not(masksm)])
 
-            #arr=arr+(average_back-meanPx)
-            #threshadj=thresh+(average_back-meanPx)
-            threshadj=thresh
+        #arr=arr+(average_back-meanPx)
+        #threshadj=thresh+(average_back-meanPx)
+        threshadj=thresh
 
-            mask=numpy.ones(arr.shape,dtype=numpy.bool)
-            mask[arrN<threshadj]=False
+        mask=numpy.ones(arr.shape,dtype=numpy.bool)
+        mask[arrN<threshadj]=False
 
-            # Measure culture phenotypes
-            locations=c2.measureSizeAndColour(locationsN,arr,im,mask,average_back,BARCODE,FILENAME[0:-4])
+        # Measure culture phenotypes
+        locations=c2.measureSizeAndColour(locationsN,arr,im,mask,average_back,BARCODE,FILENAME[0:-4])
 
-            # Write results to file
-            locations.to_csv(os.path.join(os.path.dirname(FILENAME),"Output_Data",os.path.basename(FILENAME).split(".")[0]+".out"),"\t",index=False,engine='python')
-            dataf=c2.saveColonyzer(os.path.join(os.path.dirname(FILENAME),"Output_Data",os.path.basename(FILENAME).split(".")[0]+".dat"),locations,threshadj,dx,dy)
+        # Write results to file
+        locations.to_csv(os.path.join(os.path.dirname(FILENAME),"Output_Data",os.path.basename(FILENAME).split(".")[0]+".out"),"\t",index=False,engine='python')
+        dataf=c2.saveColonyzer(os.path.join(os.path.dirname(FILENAME),"Output_Data",os.path.basename(FILENAME).split(".")[0]+".dat"),locations,threshadj,dx,dy)
 
-            # Visual check of culture locations
-            imthresh=c2.threshPreview(arr,threshadj,locations)
-            imthresh.save(os.path.join(os.path.dirname(FILENAME),"Output_Images",os.path.basename(FILENAME).split(".")[0]+".png"))
+        # Visual check of culture locations
+        imthresh=c2.threshPreview(arr,threshadj,locations)
+        imthresh.save(os.path.join(os.path.dirname(FILENAME),"Output_Images",os.path.basename(FILENAME).split(".")[0]+".png"))
 
-        # Get ready for next image
-        print("Finished: "+FILENAME+" "+str(time.time()-start)+" s")
+    # Get ready for next image
+    print("Finished: "+FILENAME+" "+str(time.time()-start)+" s")
 
-        barcdict={x:barcdict[x] for x in barcdict.keys() if not c2.checkAnalysisStarted(barcdict[x][-1])}
+    barcdict={x:barcdict[x] for x in barcdict.keys() if not c2.checkAnalysisStarted(barcdict[x][-1])}
 
-    print("No more barcodes to analyse... I'm done.")
+print("No more barcodes to analyse... I'm done.")
 
-if __name__ == '__main__':
-    main(verbose=True,inp="-d ../Auxiliary/Data -c -t -o 384")
+##if __name__ == '__main__':
+##    main(verbose=True,inp="-d ../Auxiliary/Data -c -t -o 384")
