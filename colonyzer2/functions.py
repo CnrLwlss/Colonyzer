@@ -9,7 +9,6 @@ from scipy import stats, optimize, ndimage, signal
 import scipy.optimize as op
 import itertools
 
-
 def is_number(s):
     try:
         int(s)
@@ -20,21 +19,23 @@ def is_number(s):
 def readInstructions(fullpath,fname='Colonyzer.txt'):
     '''Read instruction file output by ColonyzerParametryzer.'''
     # Try to read in the Colonyzer input file
-    Instructions=open(os.path.join(fullpath,fname),'r')
+    fpath=os.path.join(fullpath,fname)
     InsData={}
-    InsTemp=Instructions.readlines()
-
-    defaultArr=[]
-    for x in range(0,len(InsTemp)):
-        if InsTemp[x][0]!="#" and InsTemp[x][0]!="\n":
-            tlist=InsTemp[x].split(',')
-            # default with no date specified
-            if len(tlist)==6 and tlist[0]=='default':
-                defaultArr.append([tlist[1],int(tlist[2]),int(tlist[3]),int(tlist[4]),int(tlist[5]),"0000-01-01"])
-            # Capturing array of default calibrations together with dates of change (corresponding to dates cameras moved)
-            if len(tlist)==7 and tlist[0]=='default':
-                defaultArr.append([tlist[1],int(tlist[2]),int(tlist[3]),int(tlist[4]),int(tlist[5]),tlist[6].rstrip()])
-    InsData['default']=defaultArr
+    print("Expected file: "+ str(os.path.isfile(fpath)))
+    if os.path.isfile(fpath):
+        Instructions=open(fpath,'r')
+        InsTemp=Instructions.readlines()
+        defaultArr=[]
+        for x in range(0,len(InsTemp)):
+            if InsTemp[x][0]!="#" and InsTemp[x][0]!="\n":
+                tlist=InsTemp[x].split(',')
+                # default with no date specified
+                if len(tlist)==6 and tlist[0]=='default':
+                    defaultArr.append([tlist[1],int(tlist[2]),int(tlist[3]),int(tlist[4]),int(tlist[5]),"0000-01-01"])
+                # Capturing array of default calibrations together with dates of change (corresponding to dates cameras moved)
+                if len(tlist)==7 and tlist[0]=='default':
+                    defaultArr.append([tlist[1],int(tlist[2]),int(tlist[3]),int(tlist[4]),int(tlist[5]),tlist[6].rstrip()])
+        InsData['default']=defaultArr
     return(InsData)
 
 def parsePlateFormat(fmt):
@@ -360,7 +361,11 @@ def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,p
             ax[1,1].axvline(x=cand,linestyle='--',linewidth=0.5,color="black")
         ax[1,1].set_xlabel('Offset dy (px)')
         ax[1,1].set_ylabel('Autocorrelation')
-        plt.show()
+        if pdf==None:
+            plt.show()
+        else:
+            pdf.savefig()
+            plt.close()
     return((candx,candy,dx,dy))
 
 def initialGuess(intensities,counts):
@@ -621,9 +626,11 @@ def setupDirectories(dictlist,verbose=False):
         try:
             imdir=os.path.join(directory,"Output_Images")
             datdir=os.path.join(directory,"Output_Data")
+            repdir=os.path.join(directory,"Output_Reports")
             os.mkdir(imdir)
             os.mkdir(datdir)
-            if verbose: print("Created "+imdir+" & "+datdir+".")
+            os.mkdir(repdir)
+            if verbose: print("Created "+imdir+" & "+datdir+" & "+repdir+".")
             newdirs.append(directory)
         except:
             continue
