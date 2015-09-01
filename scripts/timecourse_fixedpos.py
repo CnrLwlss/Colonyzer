@@ -95,7 +95,6 @@ def buildVars(inp='',verbose=False):
         if fdict is not None and os.path.exists(fdict):
             print("Preparing to load barcodes from "+fdict+".")
     res={'lc':inp.lc,'fixedThresh':fixedThresh,'threshplots':inp.threshplots,'initpos':inp.initpos,'fdict':fdict,'fdir':fdir,'nrow':nrow,'ncol':ncol}
-    print(res)
     return(res)
 
 def locateJSON(scrID,dirHTS='.',verbose=False):
@@ -105,8 +104,6 @@ def locateJSON(scrID,dirHTS='.',verbose=False):
 
 def prepareTimecourse(barcdict,verbose=False):
     '''In timecourse mode, prepares "next" batch of images for analysis from dictionary of image names (unique image barcodes are dictionary keys).'''
-    #BARCs=barcdict.keys()
-    #BARCs.sort()
     BARCs=sorted(barcdict)
     BARCODE=BARCs[0]
     imdir=os.path.dirname(barcdict[BARCODE][0])

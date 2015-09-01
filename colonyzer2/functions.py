@@ -327,18 +327,9 @@ def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,p
     sol=op.minimize(optfun,x0=(ry/2,rx/2,(dx+dy)/2,0),method="L-BFGS-B",options={'eps':[1.0,1.0,1.0,0.05]})
     pos0=sol.x[0:2]
     dx,dy=sol.x[2],sol.x[2]    
+    theta=sol.x[3]
 
-    if len(sol.x)==4:
-        theta=sol.x[3]
-    else:
-        theta=0
     grid=makeGrid(pos0,ny,nx,dy=dy,dx=dx,theta=theta)
-
-##    lgrid=list(zip(*grid))
-##    candy=list(set(lgrid[0]))
-##    candx=list(set(lgrid[1]))
-##    candy.sort()
-##    candx.sort()
 
     candy,candx=list(zip(*grid))
 
@@ -745,8 +736,11 @@ def locateCulturesScan(candx,candy,dx,dy,arrN,nx,ny,search=0.4,radFrac=1.0,mkPlo
         locations.y=locations.y+dy/2.0
     return(locations)
 
-def locateCultures(candx,candy,dx,dy,arr,nx,ny,mkPlots=False,update=True,maxupdates=10):
-    '''Recursively calculate centre of mass for each tile until it converges (or reaches maxupdates).'''
+def edgeBrightness(arr,pos,dy,dx):
+    return(sum(arr[pos[0]:(pos[0]+dy),pos[1]])+sum(arr[pos[0]:(pos[0]+dy),pos[1]+dx])+sum(arr[pos[0],(pos[1]+1):(pos[1]+dx-1)])+sum(arr[pos[0]+dy,(pos[1]+1):(pos[1]+dx-1)]))
+
+def locateCultures(candx,candy,dx,dy,arr,nx,ny,mkPlots=False,update=True,maxupdates=10,fuzzy=0.01):
+    '''Recursively calculate centre of mass for each tile until it converges (or updates maxupdates times).'''
     cols,rows=numpy.meshgrid(numpy.arange(1,nx+1),numpy.arange(1,ny+1))
     cx=list(candx)
     cy=list(candy)
@@ -755,24 +749,21 @@ def locateCultures(candx,candy,dx,dy,arr,nx,ny,mkPlots=False,update=True,maxupda
 
     if update:
         for i in range(0,len(cx)):
-            edgesum0=sum(arr[cy[i]:(cy[i]+dy),cx[i]])+sum(arr[cy[i]:(cy[i]+dy),cx[i]+dx])+sum(arr[cy[i],(cx[i]+1):(cx[i]+dx-1)])+sum(arr[cy[i]+dy,(cx[i]+1):(cx[i]+dx-1)])
             cy0,cx0=cy[i],cx[i]
-            COM0=(int(round(cy[i]+dy/2.0)),int(round(cx[i]+dx/2.0)))
-            counter=0
             # Get centre of mass
-            COM=ndimage.measurements.center_of_mass(arr[cy[i]:(cy[i]+dy),cx[i]:(cx[i]+dx)])
-            while COM != COM0 and counter<maxupdates:
+            counter=0
+            COM0=(int(round(cy0+dy/2.0)),int(round(cx0+dx/2.0)))
+            edgesum0=edgeBrightness(arr,(cy0,cx0),dy,dx)
+            COM=ndimage.measurements.center_of_mass(arr[cy0:(cy0+dy),cx0:(cx0+dx)])
+            edgesum=edgeBrightness(arr,(int(round(cy0+COM[0]-dy/2.0)),int(round(cx0+COM[1]-dx/2.0))),dy,dx)
+            while COM != COM0 and edgesum <= (1.0+fuzzy) * edgesum0 and counter < maxupdates:
                 cy[i]=int(round(cy[i]+COM[0]-dy/2.0))
                 cx[i]=int(round(cx[i]+COM[1]-dx/2.0))
                 COM0=COM
                 COM=ndimage.measurements.center_of_mass(arr[cy[i]:(cy[i]+dy),cx[i]:(cx[i]+dx)])
+                edgesum=edgeBrightness(arr,(cy[i],cx[i]),dy,dx)
                 counter+=1
-            edgesum=sum(arr[cy[i]:(cy[i]+dy),cx[i]])+sum(arr[cy[i]:(cy[i]+dy),cx[i]+dx])+sum(arr[cy[i],(cx[i]+1):(cx[i]+dx-1)])+sum(arr[cy[i]+dy,(cx[i]+1):(cx[i]+dx-1)])
-            # If there's more culture on the edge of the tile after update, revert to original guess
-            if edgesum>edgesum0:
-                cy[i]=cy0
-                cx[i]=cx0
-
+                
     d={"Row":rows.flatten(),"Column":cols.flatten(),"y":[cyv+dy/2.0 for cyv in cy],"x":[cxv+dx/2.0 for cxv in cx]}
     locations=pandas.DataFrame(d)
     locations["Diameter"]=min(dx,dy)
