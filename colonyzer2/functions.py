@@ -285,10 +285,8 @@ def checkPos(arr,ny,nx,pos0,dy,dx,theta=0,sampfrac=0.1):
     vals=[sampleArr(arr,p,(sx,sy)) for p in pos]
     return(sum(vals))
 
-def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,pdf=None):
+def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,pdf=None,acmedian=True,rattol=0.1,glob=False):
     '''Automatically search for best estimate for location of culture array (based on culture centres, not top-left corner).'''
-    acmean=True
-
     # Generate windowed mean intensities, scanning along x and y axes
     # Estimate spot diameter, assuming grid takes up most of the plate
     diam=min(float(arr.shape[0])/ny,float(arr.shape[1])/nx)
@@ -299,15 +297,25 @@ def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,p
     sumx=ndimage.gaussian_filter1d(sumx,2.5)
     sumy=ndimage.gaussian_filter1d(sumy,2.5)
 
-    # First peak in autocorrelation function is best estimate of distance between spots
+    # Look at autocorrelation for first estimate of distance between spots
     maximay=numpy.where(numpy.diff(numpy.sign(numpy.diff(autocor(sumy))))==-2)[0]
     maximax=numpy.where(numpy.diff(numpy.sign(numpy.diff(autocor(sumx))))==-2)[0]
-    if acmean:
-        dy=int(round(numpy.mean(numpy.diff(maximay))))
-        dx=int(round(numpy.mean(numpy.diff(maximax))))
+    if acmedian:
+        # Note that median inter-peak distance is more robust here
+        # Mean is thrown by outliers: gives poor initial guess for optimisation routine
+        dy=int(round(numpy.median(numpy.diff(maximay))))
+        dx=int(round(numpy.median(numpy.diff(maximax))))
     else:
+        
         dy=int(round(maximay[0]))
         dx=int(round(maximax[0]))
+
+    # Some plate inoculation patterns (e.g. alternate columns of fit and sick strains in miniQFA) break this ACF procedure (skip every second column)
+    # However, the row ACF estimate is still robust.  In the case of disagreement, choose the smallest value
+    rat=float(dy)/float(dx)
+    if rat > (rattol+1.0) or rat < 1.0/(rattol+1.0):
+        dmin=min(dy,dx)
+        dy,dx=dmin,dmin
         
     ry=arr.shape[0]-((ny-1)*dy)
     rx=arr.shape[1]-((nx-1)*dx)
@@ -316,16 +324,29 @@ def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,p
     checkpos=list(itertools.product(*checkvecs))
 
     def optfun(x):
-        if(x[0]<0 or x[0]>rx or x[1]<0 or x[1]>ry or x[2]<=0):
+        try:
+            res=-1*checkPos(arr,ny,nx,x[0:2],dx=x[2],dy=x[2],theta=x[3],sampfrac=0.35)
+        except:
             res=300
-        else:
-            try:
-                res=-1*checkPos(arr,ny,nx,x[0:2],dx=x[2],dy=x[2],theta=x[3],sampfrac=0.35)
-            except:
-                res=300
         return(res)
 
-    sol=op.minimize(optfun,x0=(ry/2,rx/2,(dx+dy)/2,0),method="L-BFGS-B",options={'eps':[1.0,1.0,1.0,0.05]})
+    step=2.5
+    
+    if glob:
+        print("Trying global optimisation of grid location")
+        sol=op.basinhopping(optfun,x0=(ry/2,rx/2,(dx+dy)/2,0),niter=10,T=2.0,stepsize=(dx+dy)/2,minimizer_kwargs={"method":"L-BFGS-B","bounds":[(step,ry),(step,rx),(0.9*max(dy,dx),1.1*max(dy,dx)),(-5,5)],"options":{'eps':[step,step,step,0.05]}})
+    else:
+        sol=op.minimize(optfun,x0=(ry/2,rx/2,(dx+dy)/2,0),method="L-BFGS-B",bounds=[(step,ry),(step,rx),(0.9*max(dy,dx),1.1*max(dy,dx)),(-5,5)],options={'eps':[step,step,step,0.05]})
+##        sy,sx=sol.x[0:2]
+##        delt=sol.x[2]
+##        theta=sol.x[3]
+##        d=0.65*delt
+##        guesses=[(sy-d,sx),(sy,sx+d),(sy+d,sx),(sy,sx-d),(sy-d,sx-d),(sy-d,sx+d),(sy+d,sx-d),(sy+d,sx+d)]
+##        sols=[op.minimize(optfun,x0=(g[0],g[1],delt,0),method="L-BFGS-B",bounds=[(step,ry),(step,rx),(0.9*max(dy,dx),1.1*max(dy,dx)),(-5,5)],options={'eps':[step,step,step,0.05]}) for g in guesses]
+##        sols.append(sol)
+##        objs=[sol.fun for sol in sols]
+##        sol=sols[numpy.argmin(objs)]
+    
     pos0=sol.x[0:2]
     dx,dy=sol.x[2],sol.x[2]    
     theta=sol.x[3]
@@ -610,7 +631,7 @@ def saveColonyzer(filename,locs,thresh,dx,dy):
     dataf.to_csv(filename,"\t",index=False,header=False,cols=colorder,engine='python')
     return(dataf)
 
-def setupDirectories(dictlist,verbose=False):
+def setupDirectories(dictlist,verbose=True):
     '''Create output directories and return paths for writing/reading files'''
     if isinstance(dictlist,dict):
         # Flatten dictionary to list:
@@ -623,10 +644,10 @@ def setupDirectories(dictlist,verbose=False):
     newdirs=[]
     # Create directories for storing output data and preview images
     for directory in dirs:
+        imdir=os.path.join(directory,"Output_Images")
+        datdir=os.path.join(directory,"Output_Data")
+        repdir=os.path.join(directory,"Output_Reports")
         try:
-            imdir=os.path.join(directory,"Output_Images")
-            datdir=os.path.join(directory,"Output_Data")
-            repdir=os.path.join(directory,"Output_Reports")
             os.mkdir(imdir)
             os.mkdir(datdir)
             os.mkdir(repdir)

@@ -197,7 +197,7 @@ while len(barcdict)>0:
         (candx,candy,dx,dy)=loadLocationGuesses(LATESTIMAGE,InsData)
     else:
         # Automatically generate guesses for gridded array locations
-        (candx,candy,dx,dy)=c2.estimateLocations(arrN,ncol,nrow,showPlt=True,pdf=pdf)
+        (candx,candy,dx,dy)=c2.estimateLocations(arrN,ncol,nrow,showPlt=True,pdf=pdf,glob=True)
 
     # Update guesses and initialise locations data frame
     locationsN=c2.locateCultures([int(round(cx-dx/2.0)) for cx in candx],[int(round(cy-dy/2.0)) for cy in candy],dx,dy,arrN,ncol,nrow,update=updateLocations,mkPlots=False)
