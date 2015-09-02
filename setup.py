@@ -28,7 +28,7 @@ def git_version():
 
     return GIT_REVISION
 
-version='1.0.92'
+version='1.0.93'
 VERSION=version+"."+git_version()
 f=open('colonyzer2/version.py',"w")
 f.write("__version__='{}'".format(VERSION))
@@ -50,9 +50,7 @@ setup(name='Colonyzer2',
       packages=['colonyzer2','scripts'],
       description='Image analysis for microbial cultures growing on solid agar surfaces',
       long_description=open('README.txt').read(),
-      entry_points={"console_scripts":["independent = scripts.independent:main",
-                                       "timecourse = scripts.timecourse:main",
-                                       "fixedpos = scripts.timecourse_fixedpos:main",
+      entry_points={"console_scripts":["colonyzer = scripts.parseAndRun:main",
                                        "parametryzer = scripts.parameteryzer_script:main"]},
       author='Conor Lawless',
       author_email='conor.lawless@ncl.ac.uk',
@@ -62,7 +60,7 @@ setup(name='Colonyzer2',
         'Topic :: Scientific/Engineering :: Image Recognition',
         'Intended Audience :: Science/Research'
         ],
-      install_requires=['numpy>=1.9.2','scipy>=0.16.0','pandas','matplotlib','pillow'],
+      install_requires=['numpy>=1.9.2','scipy>=0.15.0','pandas','matplotlib','pillow'],
       ext_modules=ext_modules,
       include_dirs=[numpy.get_include()]
       )

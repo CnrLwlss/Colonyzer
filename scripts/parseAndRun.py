@@ -32,7 +32,8 @@ def parseArgs(inp=''):
     parser.add_argument("-c","--lc", help="Enable lighting correction?", action="store_true")
     parser.add_argument("-p","--plots", help="Plot pixel intensity distributions, segmentation thresholds and spot location traces?", action="store_true")
     parser.add_argument("-i","--initpos", help="Use intial guess for culture positions from Colonyzer.txt file?", action="store_true")
-    parser.add_argument("-s","--separate", help="Treat images separately, regardless of timecourse?", action="store_true")
+    parser.add_argument("-x","--cut", help="Cut culture signal from first image to make pseudo-empty plate?", action="store_true")
+    parser.add_argument("-v","--verbose", help="Print messages to screen during analysis?", action="store_true")
     
     parser.add_argument("-d","--dir", type=str, help="Directory in which to search for image files that have not been analysed (current directory by default).",default=".")
     parser.add_argument("-l","--logsdir", type=str, help="Directory in which to search for JSON files listing images for analyis (e.g. LOGS3, root of HTS filestore).  Only used when intending to specify images for analysis in .json file (see -u).",default=".")
@@ -46,9 +47,14 @@ def parseArgs(inp=''):
         args = parser.parse_args(inp.split())
     return(args)
 
-def buildVars(inp='',verbose=False):
+def buildVars(inp=''):
     '''Read user input, set up flags for analysis, report on options chosen and find files to be analysed.'''
     inp=parseArgs(inp)
+
+    if inp.verbose:
+        Verbose=True
+    else:
+        Verbose=False
     
     if inp.dir==None:
         fdir=os.getcwd()
@@ -89,17 +95,17 @@ def buildVars(inp='',verbose=False):
             print("Using user-specified initial guess for colony locations.  NOTE: Colonyzer.txt file must be located in directory with images to be analysed.  See Parametryzer for more information.")
         else:
             print("Searching for colony locations automatically.")
-        if inp.separate:
-            print("Analysing each image separately.")
+        if inp.cut:
+            print("Cutting cell signal from first image to create pseudo-empty plate (for lighting correction).")
         else:
-            print("Analysing series of images as timecourses.")
+            print("Using first plate as best estimate of pseudo-empty plate (for lighting correction).")
         if fixedThresh==-99:
             print("Image segmentation by automatic thresholding.")
         else:
             print("Images will be segmented using fixed threshold: "+str(fixedThresh)+".")
         if fdict is not None and os.path.exists(fdict):
             print("Preparing to load barcodes from "+fdict+".")
-    res={'lc':inp.lc,'fixedThresh':fixedThresh,'plots':inp.plots,'initpos':inp.initpos,'fdict':fdict,'fdir':fdir,'nrow':nrow,'ncol':ncol}
+    res={'lc':inp.lc,'fixedThresh':fixedThresh,'plots':inp.plots,'initpos':inp.initpos,'fdict':fdict,'fdir':fdir,'nrow':nrow,'ncol':ncol,'cut':inp.cut,'verbose':Verbose}
     return(res)
 
 def locateJSON(scrID,dirHTS='.',verbose=False):
@@ -155,125 +161,120 @@ def edgeFill(arr,locations,cutoff=0.8):
     maskN=ndimage.morphology.binary_erosion(fillN,iterations=7)
     return(maskN)
 
-verbose=True
-inp="-d ../Auxiliary/Data/endpoints/384 -p -o 384"
+def main(inp=""):
+    print("Colonyzer "+c2.__version__)
 
-#def main(inp="",verbose=False):
-print("Colonyzer "+c2.__version__)
+    cythonFill=False
 
-cutFromFirst=False
-cythonFill=False
-updateLocations=True
+    var=buildVars(inp=inp)
+    correction,fixedThresh,plots,initpos,fdict,fdir,nrow,ncol,cut,verbose=(var["lc"],var["fixedThresh"],var["plots"],var["initpos"],var["fdict"],var["fdir"],var["nrow"],var["ncol"],var["cut"],var["verbose"])
+    barcdict=checkImages(fdir,fdict,verbose=verbose)
+    rept=c2.setupDirectories(barcdict,verbose=verbose)
 
-var=buildVars(verbose=verbose,inp=inp)
-correction,fixedThresh,plots,initpos,fdict,fdir,nrow,ncol=(var["lc"],var["fixedThresh"],var["plots"],var["initpos"],var["fdict"],var["fdir"],var["nrow"],var["ncol"])
-barcdict=checkImages(fdir,fdict,verbose=verbose)
-rept=c2.setupDirectories(barcdict,verbose=verbose)
+    start=time.time()
 
-start=time.time()
+    while len(barcdict)>0:
 
-while len(barcdict)>0:
+        BARCODE,imdir,InsData,LATESTIMAGE,EARLIESTIMAGE,imRoot=prepareTimecourse(barcdict,verbose=verbose)  
 
-    BARCODE,imdir,InsData,LATESTIMAGE,EARLIESTIMAGE,imRoot=prepareTimecourse(barcdict,verbose=verbose)  
-
-    if plots:
-        pdf=PdfPages(os.path.join(os.path.dirname(EARLIESTIMAGE),"Output_Reports",os.path.basename(EARLIESTIMAGE).split(".")[0]+".pdf"))
-    else:
-        pdf=None
-    
-    # Create empty file to indicate that barcode is currently being analysed, to allow parallel analysis (lock files)
-    tmp=open(os.path.join(os.path.dirname(EARLIESTIMAGE),"Output_Data",os.path.basename(EARLIESTIMAGE).split(".")[0]+".out"),"w").close()
-
-    # Get latest image for thresholding and detecting culture locations
-    imN,arrN=c2.openImage(LATESTIMAGE)
-    # Get earliest image for lighting gradient correction
-    if(LATESTIMAGE==EARLIESTIMAGE):
-        im0,arr0=imN,arrN
-    else:
-        im0,arr0=c2.openImage(EARLIESTIMAGE)
-
-    if initpos:
-        # Load initial guesses from Colonyzer.txt file
-        (candx,candy,dx,dy)=loadLocationGuesses(LATESTIMAGE,InsData)
-    else:
-        # Automatically generate guesses for gridded array locations
-        (candx,candy,dx,dy)=c2.estimateLocations(arrN,ncol,nrow,showPlt=True,pdf=pdf,glob=True)
-
-    # Update guesses and initialise locations data frame
-    locationsN=c2.locateCultures([int(round(cx-dx/2.0)) for cx in candx],[int(round(cy-dy/2.0)) for cy in candy],dx,dy,arrN,ncol,nrow,update=updateLocations,mkPlots=False)
-
-    if cutFromFirst:
-        mask=edgeFill(arr0,locationsN,0.8)
-        startFill=time.time()
-        if cythonFill:
-            pseudoempty=maskAndFillCython(arr0,maskN,0.005)
-            print("Inpainting using Cython & NumPy: "+str(time.time()-startFill)+" s")
-        else:
-            pseudoempty=maskAndFill(arr0,mask,0.005)
-            print("Inpainting using NumPy: "+str(time.time()-start)+" s")
-    else:
-        pseudoempty=arr0
-
-    if correction:
-        # Smooth (pseudo-)empty image 
-        (correction_map,average_back)=c2.makeCorrectionMap(pseudoempty,locationsN,verbose=verbose)
-        
-        # Correct spatial gradient in final image
-        corrected_arrN=arrN*correction_map
-    else:
-        average_back=1.0
-        corrected_arrN=arrN
-
-    # Trim outer part of image to remove plate walls
-    trimmed_arrN=arrN[max(0,int(round(min(locationsN.y)-dy/2.0))):min(arrN.shape[0],int(round((max(locationsN.y)+dy/2.0)))),max(0,int(round(min(locationsN.x)-dx/2.0))):min(arrN.shape[1],int(round((max(locationsN.x)+dx/2.0))))]
-    
-    if fixedThresh>=0:
-        thresh=fixedThresh
-    else:
-        (thresh,bindat)=c2.automaticThreshold(trimmed_arrN,BARCODE,pdf=pdf)
         if plots:
-            c2.plotModel(bindat,label=BARCODE,pdf=pdf)
-
-    # Mask for identifying culture areas
-    maskN=numpy.ones(arrN.shape,dtype=numpy.bool)
-    maskN[arrN<thresh]=False
-
-    for FILENAME in barcdict[BARCODE]:
-        im,arr=c2.openImage(FILENAME)
-        if correction:
-            arr=arr*correction_map
+            pdf=PdfPages(os.path.join(os.path.dirname(EARLIESTIMAGE),"Output_Reports",os.path.basename(EARLIESTIMAGE).split(".")[0]+".pdf"))
+        else:
+            pdf=None
         
-        # Correct for lighting differences between plates
-        arrsm=arr[max(0,int(round(min(locationsN.y)-dy/2.0))):min(arrN.shape[0],int(round((max(locationsN.y)+dy/2.0)))),max(0,int(round(min(locationsN.x)-dx/2.0))):min(arrN.shape[1],int(round((max(locationsN.x)+dx/2.0))))]
-        masksm=maskN[max(0,int(round(min(locationsN.y)-dy/2.0))):min(arrN.shape[0],int(round((max(locationsN.y)+dy/2.0)))),max(0,int(round(min(locationsN.x)-dx/2.0))):min(arrN.shape[1],int(round((max(locationsN.x)+dx/2.0))))]
-        meanPx=numpy.mean(arrsm[numpy.logical_not(masksm)])
+        # Create empty file to indicate that barcode is currently being analysed, to allow parallel analysis (lock files)
+        tmp=open(os.path.join(os.path.dirname(EARLIESTIMAGE),"Output_Data",os.path.basename(EARLIESTIMAGE).split(".")[0]+".out"),"w").close()
 
-        #arr=arr+(average_back-meanPx)
-        #threshadj=thresh+(average_back-meanPx)
-        threshadj=thresh
+        # Get latest image for thresholding and detecting culture locations
+        imN,arrN=c2.openImage(LATESTIMAGE)
+        # Get earliest image for lighting gradient correction
+        if(LATESTIMAGE==EARLIESTIMAGE):
+            im0,arr0=imN,arrN
+        else:
+            im0,arr0=c2.openImage(EARLIESTIMAGE)
 
-        mask=numpy.ones(arr.shape,dtype=numpy.bool)
-        mask[arrN<threshadj]=False
+        if initpos:
+            # Load initial guesses from Colonyzer.txt file
+            (candx,candy,dx,dy)=loadLocationGuesses(LATESTIMAGE,InsData)
+        else:
+            # Automatically generate guesses for gridded array locations
+            (candx,candy,dx,dy)=c2.estimateLocations(arrN,ncol,nrow,showPlt=True,pdf=pdf,glob=True)
 
-        # Measure culture phenotypes
-        locations=c2.measureSizeAndColour(locationsN,arr,im,mask,average_back,BARCODE,FILENAME[0:-4])
+        # Update guesses and initialise locations data frame
+        locationsN=c2.locateCultures([int(round(cx-dx/2.0)) for cx in candx],[int(round(cy-dy/2.0)) for cy in candy],dx,dy,arrN,ncol,nrow,update=True,mkPlots=False)
 
-        # Write results to file
-        locations.to_csv(os.path.join(os.path.dirname(FILENAME),"Output_Data",os.path.basename(FILENAME).split(".")[0]+".out"),"\t",index=False,engine='python')
-        dataf=c2.saveColonyzer(os.path.join(os.path.dirname(FILENAME),"Output_Data",os.path.basename(FILENAME).split(".")[0]+".dat"),locations,threshadj,dx,dy)
+        if cut:
+            mask=edgeFill(arr0,locationsN,0.8)
+            startFill=time.time()
+            if cythonFill:
+                pseudoempty=maskAndFillCython(arr0,maskN,0.005)
+                print("Inpainting using Cython & NumPy: "+str(time.time()-startFill)+" s")
+            else:
+                pseudoempty=maskAndFill(arr0,mask,0.005)
+                print("Inpainting using NumPy: "+str(time.time()-start)+" s")
+        else:
+            pseudoempty=arr0
 
-        # Visual check of culture locations
-        imthresh=c2.threshPreview(arr,threshadj,locations)
-        imthresh.save(os.path.join(os.path.dirname(FILENAME),"Output_Images",os.path.basename(FILENAME).split(".")[0]+".png"))
+        if correction:
+            # Smooth (pseudo-)empty image 
+            (correction_map,average_back)=c2.makeCorrectionMap(pseudoempty,locationsN,verbose=verbose)
+            
+            # Correct spatial gradient in final image
+            corrected_arrN=arrN*correction_map
+        else:
+            average_back=1.0
+            corrected_arrN=arrN
 
-    # Get ready for next image
-    print("Finished: "+FILENAME+" "+str(time.time()-start)+" s")
+        # Trim outer part of image to remove plate walls
+        trimmed_arrN=arrN[max(0,int(round(min(locationsN.y)-dy/2.0))):min(arrN.shape[0],int(round((max(locationsN.y)+dy/2.0)))),max(0,int(round(min(locationsN.x)-dx/2.0))):min(arrN.shape[1],int(round((max(locationsN.x)+dx/2.0))))]
+        
+        if fixedThresh>=0:
+            thresh=fixedThresh
+        else:
+            (thresh,bindat)=c2.automaticThreshold(trimmed_arrN,BARCODE,pdf=pdf)
+            if plots:
+                c2.plotModel(bindat,label=BARCODE,pdf=pdf)
 
-    barcdict={x:barcdict[x] for x in barcdict.keys() if not c2.checkAnalysisStarted(barcdict[x][-1])}
-    if plots:
-        pdf.close()
+        # Mask for identifying culture areas
+        maskN=numpy.ones(arrN.shape,dtype=numpy.bool)
+        maskN[arrN<thresh]=False
 
-print("No more barcodes to analyse... I'm done.")
+        for FILENAME in barcdict[BARCODE]:
+            im,arr=c2.openImage(FILENAME)
+            if correction:
+                arr=arr*correction_map
+            
+            # Correct for lighting differences between plates
+            arrsm=arr[max(0,int(round(min(locationsN.y)-dy/2.0))):min(arrN.shape[0],int(round((max(locationsN.y)+dy/2.0)))),max(0,int(round(min(locationsN.x)-dx/2.0))):min(arrN.shape[1],int(round((max(locationsN.x)+dx/2.0))))]
+            masksm=maskN[max(0,int(round(min(locationsN.y)-dy/2.0))):min(arrN.shape[0],int(round((max(locationsN.y)+dy/2.0)))),max(0,int(round(min(locationsN.x)-dx/2.0))):min(arrN.shape[1],int(round((max(locationsN.x)+dx/2.0))))]
+            meanPx=numpy.mean(arrsm[numpy.logical_not(masksm)])
 
-##if __name__ == '__main__':
-##    main(verbose=True,inp="-d ../Auxiliary/Data -c -t -o 384")
+            #arr=arr+(average_back-meanPx)
+            #threshadj=thresh+(average_back-meanPx)
+            threshadj=thresh
+
+            mask=numpy.ones(arr.shape,dtype=numpy.bool)
+            mask[arrN<threshadj]=False
+
+            # Measure culture phenotypes
+            locations=c2.measureSizeAndColour(locationsN,arr,im,mask,average_back,BARCODE,FILENAME[0:-4])
+
+            # Write results to file
+            locations.to_csv(os.path.join(os.path.dirname(FILENAME),"Output_Data",os.path.basename(FILENAME).split(".")[0]+".out"),"\t",index=False,engine='python')
+            dataf=c2.saveColonyzer(os.path.join(os.path.dirname(FILENAME),"Output_Data",os.path.basename(FILENAME).split(".")[0]+".dat"),locations,threshadj,dx,dy)
+
+            # Visual check of culture locations
+            imthresh=c2.threshPreview(arr,threshadj,locations)
+            imthresh.save(os.path.join(os.path.dirname(FILENAME),"Output_Images",os.path.basename(FILENAME).split(".")[0]+".png"))
+
+        # Get ready for next image
+        print("Finished: "+FILENAME+" "+str(time.time()-start)+" s")
+
+        barcdict={x:barcdict[x] for x in barcdict.keys() if not c2.checkAnalysisStarted(barcdict[x][-1])}
+        if plots:
+            pdf.close()
+
+    print("No more barcodes to analyse... I'm done.")
+
+if __name__ == '__main__':
+    main()

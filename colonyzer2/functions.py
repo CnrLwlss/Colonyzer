@@ -21,7 +21,6 @@ def readInstructions(fullpath,fname='Colonyzer.txt'):
     # Try to read in the Colonyzer input file
     fpath=os.path.join(fullpath,fname)
     InsData={}
-    print("Expected file: "+ str(os.path.isfile(fpath)))
     if os.path.isfile(fpath):
         Instructions=open(fpath,'r')
         InsTemp=Instructions.readlines()
@@ -285,7 +284,7 @@ def checkPos(arr,ny,nx,pos0,dy,dx,theta=0,sampfrac=0.1):
     vals=[sampleArr(arr,p,(sx,sy)) for p in pos]
     return(sum(vals))
 
-def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,pdf=None,acmedian=True,rattol=0.1,glob=False):
+def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,pdf=None,acmedian=True,rattol=0.1,glob=False,verbose=False):
     '''Automatically search for best estimate for location of culture array (based on culture centres, not top-left corner).'''
     # Generate windowed mean intensities, scanning along x and y axes
     # Estimate spot diameter, assuming grid takes up most of the plate
@@ -333,19 +332,11 @@ def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,p
     step=2.5
     
     if glob:
-        print("Trying global optimisation of grid location")
-        sol=op.basinhopping(optfun,x0=(ry/2,rx/2,(dx+dy)/2,0),niter=10,T=2.0,stepsize=(dx+dy)/2,minimizer_kwargs={"method":"L-BFGS-B","bounds":[(step,ry),(step,rx),(0.9*max(dy,dx),1.1*max(dy,dx)),(-5,5)],"options":{'eps':[step,step,step,0.05]}})
+        if verbose: print("Trying global optimisation of grid location.")
+        stepsize=math.sqrt(3*((dx+dy)/2)**2+180**2)
+        sol=op.basinhopping(optfun,x0=(ry/2,rx/2,(dx+dy)/2,0),niter=25,T=2.0,stepsize=stepsize,minimizer_kwargs={"method":"L-BFGS-B","bounds":[(step,ry),(step,rx),(0.9*max(dy,dx),1.1*max(dy,dx)),(-5,5)],"options":{'eps':[step,step,step,0.05]}})
     else:
         sol=op.minimize(optfun,x0=(ry/2,rx/2,(dx+dy)/2,0),method="L-BFGS-B",bounds=[(step,ry),(step,rx),(0.9*max(dy,dx),1.1*max(dy,dx)),(-5,5)],options={'eps':[step,step,step,0.05]})
-##        sy,sx=sol.x[0:2]
-##        delt=sol.x[2]
-##        theta=sol.x[3]
-##        d=0.65*delt
-##        guesses=[(sy-d,sx),(sy,sx+d),(sy+d,sx),(sy,sx-d),(sy-d,sx-d),(sy-d,sx+d),(sy+d,sx-d),(sy+d,sx+d)]
-##        sols=[op.minimize(optfun,x0=(g[0],g[1],delt,0),method="L-BFGS-B",bounds=[(step,ry),(step,rx),(0.9*max(dy,dx),1.1*max(dy,dx)),(-5,5)],options={'eps':[step,step,step,0.05]}) for g in guesses]
-##        sols.append(sol)
-##        objs=[sol.fun for sol in sols]
-##        sol=sols[numpy.argmin(objs)]
     
     pos0=sol.x[0:2]
     dx,dy=sol.x[2],sol.x[2]    
