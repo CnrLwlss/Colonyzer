@@ -17,7 +17,7 @@ Colonyzer is currently undergoing major redevelopment
 * Improved spot location algorithm - recursive estimation of centre of mass of each spot, subject to no increase in signal along tile edge, refines grid location estimates for irregular spots
 * Alternative segmentation algorithm - detects cells by first detecting culture edges and infilling: even higher sensitivity at very low signal levels
 * Improved lighting correction - generate pseudo-empty plate by infilling segmented pixels using a Gaussian Random Markov Field update
-* Test datasets - [suite](../Auxiliary/Data) of problematic images for checking performance of scripts and algorithms
+* Test datasets - [suite](Auxiliary/Data) of problematic images for checking performance of scripts and algorithms
 
 Website describing current, stable release:
 http://research.ncl.ac.uk/colonyzer/
