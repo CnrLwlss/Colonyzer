@@ -255,6 +255,7 @@ def sampleArr(arr,pos,svals):
     sx,sy=svals
     minx,miny=max(0,x-sx),max(0,y-sy)
     maxx,maxy=min(arr.shape[1]-1,x+sx), min(arr.shape[0]-1,y+sy)
+    #val=numpy.nansum(arr[miny:maxy,minx:maxx])
     samp=arr[miny:maxy,minx:maxx].flatten()
     lsamp=len(samp)
     if lsamp<sx*sy:
@@ -305,7 +306,6 @@ def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,p
         dy=int(round(numpy.median(numpy.diff(maximay))))
         dx=int(round(numpy.median(numpy.diff(maximax))))
     else:
-        
         dy=int(round(maximay[0]))
         dx=int(round(maximax[0]))
 
@@ -329,18 +329,34 @@ def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,p
             res=300
         return(res)
 
-    step=2.5
+    step=1.0
+
+    ey,ex=ry/2,rx/2
+    # Assume we can see the edges of the plate in the image (bright enough to make a peak in the smoothed intensities
+    peaksy=numpy.where(numpy.diff(numpy.sign(numpy.diff(sumy)))==-2)[0]
+    peaksx=numpy.where(numpy.diff(numpy.sign(numpy.diff(sumx)))==-2)[0]
+    corner=[peaksy[0],peaksx[0]]
+
+    com=ndimage.measurements.center_of_mass(arr)
+    com=[int(round(x)) for x in com]
+
+    guess=[int(round(corner[0]+2*dy)),int(round(corner[1]+2*dx))]
+    ey,ex=guess
     
     if glob:
         if verbose: print("Trying global optimisation of grid location.")
         stepsize=math.sqrt(3*((dx+dy)/2)**2+180**2)
-        sol=op.basinhopping(optfun,x0=(ry/2,rx/2,(dx+dy)/2,0),niter=25,T=2.0,stepsize=stepsize,minimizer_kwargs={"method":"L-BFGS-B","bounds":[(step,ry),(step,rx),(0.9*max(dy,dx),1.1*max(dy,dx)),(-5,5)],"options":{'eps':[step,step,step,0.05]}})
+        sol=op.basinhopping(optfun,x0=(ey,ex,(dx+dy)/2,0),niter=25,T=2.0,stepsize=stepsize,minimizer_kwargs={"method":"L-BFGS-B","bounds":[(step,ry),(step,rx),(0.9*max(dy,dx),1.1*max(dy,dx)),(-5,5)],"options":{'eps':[step,step,step,0.05]}})
     else:
-        sol=op.minimize(optfun,x0=(ry/2,rx/2,(dx+dy)/2,0),method="L-BFGS-B",bounds=[(step,ry),(step,rx),(0.9*max(dy,dx),1.1*max(dy,dx)),(-5,5)],options={'eps':[step,step,step,0.05]})
+        sol=op.minimize(optfun,x0=(ey,ex,(dx+dy)/2,0),method="L-BFGS-B",bounds=[(step,ry),(step,rx),(0.9*max(dy,dx),1.1*max(dy,dx)),(-5,5)],options={'eps':[step,step,step,0.05]})
     
     pos0=sol.x[0:2]
-    dx,dy=sol.x[2],sol.x[2]    
+    dy,dx=sol.x[2],sol.x[2]    
     theta=sol.x[3]
+
+    if verbose:
+        print("Optimisation: "+sol.message)
+        print(sol)
 
     grid=makeGrid(pos0,ny,nx,dy=dy,dx=dx,theta=theta)
 
@@ -378,7 +394,7 @@ def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,p
         else:
             pdf.savefig()
             plt.close()
-    return((candx,candy,dx,dy))
+    return((candx,candy,dx,dy,corner,com,guess))
 
 def initialGuess(intensities,counts):
     '''Construct non-parametric guesses for distributions of two components and use these to estimate Gaussian parameters'''
@@ -756,9 +772,13 @@ def locateCulturesScan(candx,candy,dx,dy,arrN,nx,ny,search=0.4,radFrac=1.0,mkPlo
     return(locations)
 
 def edgeBrightness(arr,pos,dy,dx):
-    return(sum(arr[pos[0]:(pos[0]+dy),pos[1]])+sum(arr[pos[0]:(pos[0]+dy),pos[1]+dx])+sum(arr[pos[0],(pos[1]+1):(pos[1]+dx-1)])+sum(arr[pos[0]+dy,(pos[1]+1):(pos[1]+dx-1)]))
+    try:
+        res=sum(arr[pos[0]:(pos[0]+dy),pos[1]])+sum(arr[pos[0]:(pos[0]+dy),pos[1]+dx])+sum(arr[pos[0],(pos[1]+1):(pos[1]+dx-1)])+sum(arr[pos[0]+dy,(pos[1]+1):(pos[1]+dx-1)])
+    except:
+        res=99999999999999999
+    return(res)
 
-def locateCultures(candx,candy,dx,dy,arr,nx,ny,mkPlots=False,update=True,maxupdates=10,fuzzy=0.01):
+def locateCultures(candx,candy,dx,dy,arr,nx,ny,update=True,maxupdates=10,fuzzy=0.01):
     '''Recursively calculate centre of mass for each tile until it converges (or updates maxupdates times).'''
     cols,rows=numpy.meshgrid(numpy.arange(1,nx+1),numpy.arange(1,ny+1))
     cx=list(candx)
@@ -826,8 +846,9 @@ def maskAndFill(arrN,finalMask,tol=5):
     
 def makeCorrectionMap(arr0,locations,smoothfactor=250,verbose=True):
     '''Smooth a (pseudo-)empty plate image to generate a correction map.'''
+    dy,dx=locations.Diameter[0],locations.Diameter[0]
     smoothed_arr=ndimage.gaussian_filter(arr0,arr0.shape[1]/smoothfactor)
-    average_back=numpy.mean(smoothed_arr[numpy.min(locations.y):numpy.max(locations.y),numpy.min(locations.x):numpy.max(locations.x)])
+    average_back=numpy.median(smoothed_arr[numpy.min(locations.y):numpy.max(locations.y),numpy.min(locations.x):numpy.max(locations.x)])
     correction_map=average_back/smoothed_arr
     if verbose: print("Lighting correction map constructed.")
     return(correction_map,average_back)
