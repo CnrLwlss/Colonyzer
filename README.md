@@ -11,7 +11,7 @@ Colonyzer is currently undergoing major redevelopment
 
 * Python 3 compatible - installation via pip more straightforward
 * New command-line interface - separate analysis scripts merged into improved command-line structure
-* Improved documentation - access hints about options directly on the command line
+* Improved documentation - access hints about options [directly](CommandLine.md) on the command line
 * Easier grid location - only specify gridded array format, Colonyzer.txt calibration files should not be necessary for most images
 * Improved grid location algorithms - estimate grid width by autocorrelation analysis, grid location and rotation by gradient-based optimisation (with optional global search)
 * Improved spot location algorithm - recursive estimation of centre of mass of each spot, subject to no increase in signal along tile edge, refines grid location estimates for irregular spots
