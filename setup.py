@@ -60,7 +60,7 @@ setup(name='Colonyzer2',
         'Topic :: Scientific/Engineering :: Image Recognition',
         'Intended Audience :: Science/Research'
         ],
-      install_requires=['numpy>=1.9.2','scipy>=0.15.0','pandas','matplotlib','pillow'],
+      install_requires=['numpy>=1.9.0','scipy>=0.14.1','pandas','matplotlib','pillow','sobol'],
       ext_modules=ext_modules,
       include_dirs=[numpy.get_include()]
       )

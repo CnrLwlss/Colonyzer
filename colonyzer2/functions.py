@@ -322,13 +322,6 @@ def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,p
     checkvecs=[range(ry),range(rx)]
     checkpos=list(itertools.product(*checkvecs))
 
-    def optfun(x):
-        try:
-            res=-1*checkPos(arr,ny,nx,x[0:2],dx=x[2],dy=x[2],theta=x[3],sampfrac=0.35)
-        except:
-            res=300
-        return(res)
-
     step=1.0
 
     ey,ex=ry/2,rx/2
@@ -342,17 +335,42 @@ def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,p
 
     guess=[int(round(corner[0]+2*dy)),int(round(corner[1]+2*dx))]
     ey,ex=guess
+
+    nsol=5
+    step=2.0
+    bounds=[(step,ry),(step,rx),(0.9*max(dy,dx),1.1*max(dy,dx)),(-5,5)]
+
+    def makeOpt(arr,ny,nx,bounds,sampfrac=0.35):
+        def optfun(xvals):
+            print("0...1")
+            print(xvals)
+            x=[b[0]+xv*(b[1]-b[0]) for b,xv in zip(bounds,xvals)]
+            res=-1*checkPos(arr,ny,nx,x[0:2],dx=x[2],dy=x[2],theta=x[3],sampfrac=sampfrac)
+            print((xvals,x,res))
+            return(res)
+        return(optfun)
+
+    optfun=makeOpt(arr,ny,nx,bounds)
+    xguess=list([0.5 for b in bounds])
+    nb=len(bounds)
     
-    if glob:
-        if verbose: print("Trying global optimisation of grid location.")
-        stepsize=math.sqrt(3*((dx+dy)/2)**2+180**2)
-        sol=op.basinhopping(optfun,x0=(ey,ex,(dx+dy)/2,0),niter=25,T=2.0,stepsize=stepsize,minimizer_kwargs={"method":"L-BFGS-B","bounds":[(step,ry),(step,rx),(0.9*max(dy,dx),1.1*max(dy,dx)),(-5,5)],"options":{'eps':[step,step,step,0.05]}})
+    if nsol==1:
+        x0=[xguess]
     else:
-        sol=op.minimize(optfun,x0=(ey,ex,(dx+dy)/2,0),method="L-BFGS-B",bounds=[(step,ry),(step,rx),(0.9*max(dy,dx),1.1*max(dy,dx)),(-5,5)],options={'eps':[step,step,step,0.05]})
+        if verbose: print("Trying global optimisation of grid location, using Sobol sequence.")
+        import sobol
+        x0s=[sobol.i4_sobol(nb,i)[0] for i in range(nsol)]
+        x0s.append(xguess)
+    print("Starting points")
+    print(x0s)
+    sols=[op.minimize(optfun,x0=x0,method="L-BFGS-B",bounds=bounds,options={'eps':0.01}) for x0 in x0s]
+    sol=sols[numpy.argmin([s.fun for s in sols])]
+
+    soln=[b[0]+xv*(b[1]-b[0]) for b,xv in zip(bounds,sol.x)]
     
-    pos0=sol.x[0:2]
-    dy,dx=sol.x[2],sol.x[2]    
-    theta=sol.x[3]
+    pos0=soln[0:2]
+    dy,dx=soln[2],soln[2]    
+    theta=soln[3]
 
     if verbose:
         print("Optimisation: "+sol.message)
