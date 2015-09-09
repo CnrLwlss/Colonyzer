@@ -43,7 +43,7 @@ except ImportError:
     ext_modules=[]
 else:
     from Cython.Build import cythonize
-    ext_modules=cythonize("colonyzer2/maskfill.pyx")
+    ext_modules=cythonize("./colonyzer2/maskfill.pyx")
 
 setup(name='Colonyzer2',
       version=version,
