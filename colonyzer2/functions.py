@@ -8,6 +8,7 @@ import scipy
 from scipy import stats, optimize, ndimage, signal
 import scipy.optimize as op
 import itertools
+import sobol
 
 def is_number(s):
     try:
@@ -257,10 +258,12 @@ def sampleArr(arr,pos,svals):
     maxx,maxy=min(arr.shape[1]-1,x+sx), min(arr.shape[0]-1,y+sy)
     #val=numpy.nansum(arr[miny:maxy,minx:maxx])
     samp=arr[miny:maxy,minx:maxx].flatten()
-    lsamp=len(samp)
-    if lsamp<sx*sy:
-        samp=numpy.append(samp,numpy.zeros(sx*sy-lsamp))
+##    lsamp=len(samp)
+##    if lsamp<sx*sy:
+##        samp=numpy.append(samp,numpy.zeros(sx*sy-lsamp))
     val=numpy.nanmedian(samp)
+    if numpy.isnan(val):
+        val=0
     return(val)
 
 def makeGrid(pos0,ny,nx,dy,dx,theta=0):
@@ -285,7 +288,7 @@ def checkPos(arr,ny,nx,pos0,dy,dx,theta=0,sampfrac=0.1):
     vals=[sampleArr(arr,p,(sx,sy)) for p in pos]
     return(sum(vals))
 
-def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,pdf=None,acmedian=True,rattol=0.1,glob=False,verbose=False):
+def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,pdf=None,acmedian=True,rattol=0.1,glob=False,verbose=False,nsol=400):
     '''Automatically search for best estimate for location of culture array (based on culture centres, not top-left corner).'''
     # Generate windowed mean intensities, scanning along x and y axes
     # Estimate spot diameter, assuming grid takes up most of the plate
@@ -322,9 +325,6 @@ def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,p
     checkvecs=[range(ry),range(rx)]
     checkpos=list(itertools.product(*checkvecs))
 
-    step=1.0
-
-    ey,ex=ry/2,rx/2
     # Assume we can see the edges of the plate in the image (bright enough to make a peak in the smoothed intensities
     peaksy=numpy.where(numpy.diff(numpy.sign(numpy.diff(sumy)))==-2)[0]
     peaksx=numpy.where(numpy.diff(numpy.sign(numpy.diff(sumx)))==-2)[0]
@@ -333,41 +333,44 @@ def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,p
     com=ndimage.measurements.center_of_mass(arr)
     com=[int(round(x)) for x in com]
 
-    guess=[int(round(corner[0]+2*dy)),int(round(corner[1]+2*dx))]
-    ey,ex=guess
+    bounds=[(0,ry),(0,rx),(0.8*max(dy,dx),1.2*max(dy,dx)),(-5,5)]
 
-    nsol=5
-    step=2.0
-    bounds=[(step,ry),(step,rx),(0.9*max(dy,dx),1.1*max(dy,dx)),(-5,5)]
+    def makeOpt(arr,ny,nx,bounds,sampfrac=0.40):
+        def optfun(xvs):
+            xrs=[b[0]+xv*(b[1]-b[0]) for b,xv in zip(bounds,xvs)]
+            res=-1*checkPos(arr,ny,nx,xrs[0:2],xrs[2],xrs[2],xrs[3],sampfrac=sampfrac)
+            return (res)
+        return optfun
 
-    def makeOpt(arr,ny,nx,bounds,sampfrac=0.35):
-        def optfun(xvals):
-            print("0...1")
-            print(xvals)
-            x=[b[0]+xv*(b[1]-b[0]) for b,xv in zip(bounds,xvals)]
-            res=-1*checkPos(arr,ny,nx,x[0:2],dx=x[2],dy=x[2],theta=x[3],sampfrac=sampfrac)
-            print((xvals,x,res))
-            return(res)
-        return(optfun)
+    def makeOpt2(arr,ny,nx,dx_norm,theta_norm,bounds,sampfrac=0.40):
+        dx=bounds[2][0]+dx_norm*(bounds[2][1]-bounds[2][0])
+        theta=bounds[3][0]+theta_norm*(bounds[3][1]-bounds[3][0])
+        def optfun(xvs):
+            xrs=[b[0]+xv*(b[1]-b[0]) for b,xv in zip(bounds,xvs)]
+            res=-1*checkPos(arr,ny,nx,xrs,dx,dx,theta,sampfrac=sampfrac)
+            return (res)
+        return optfun
 
-    optfun=makeOpt(arr,ny,nx,bounds)
+    opt1=makeOpt(arr,ny,nx,bounds)
     xguess=list([0.5 for b in bounds])
     nb=len(bounds)
-    
-    if nsol==1:
-        x0=[xguess]
-    else:
-        if verbose: print("Trying global optimisation of grid location, using Sobol sequence.")
-        import sobol
-        x0s=[sobol.i4_sobol(nb,i)[0] for i in range(nsol)]
-        x0s.append(xguess)
-    print("Starting points")
-    print(x0s)
-    sols=[op.minimize(optfun,x0=x0,method="L-BFGS-B",bounds=bounds,options={'eps':0.01}) for x0 in x0s]
-    sol=sols[numpy.argmin([s.fun for s in sols])]
 
+    optmess=False
+    sol1=op.minimize(opt1,x0=xguess,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds],jac=False,options={'eps':0.005,'disp':optmess,'gtol':0.1})
+    bounds2=bounds[0:2]
+    opt2=makeOpt2(arr,ny,nx,sol1.x[2],sol1.x[3],bounds)
+    # For even sampling: nsol = Nsamps**Ndim
+    x0s=[sobol.i4_sobol(len(bounds2),i)[0] for i in range(nsol)]
+    x0s.append(xguess[0:2])
+    x0s.append(sol1.x[0:2])
+    firstpass=[opt2(x) for x in x0s]
+    firstguess=x0s[numpy.argmin(firstpass)]
+    sol2=op.minimize(opt2,x0=firstguess,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds2],jac=False,options={'eps':0.005,'disp':optmess,'gtol':0.1})
+    soln2=sol2.x
+    soln2=numpy.append(soln2,sol1.x[2:])
+    sol=op.minimize(opt1,x0=soln2,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds],jac=False,options={'eps':0.005,'disp':optmess,'gtol':0.1})
     soln=[b[0]+xv*(b[1]-b[0]) for b,xv in zip(bounds,sol.x)]
-    
+
     pos0=soln[0:2]
     dy,dx=soln[2],soln[2]    
     theta=soln[3]
@@ -412,7 +415,8 @@ def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,p
         else:
             pdf.savefig()
             plt.close()
-    return((candx,candy,dx,dy,corner,com,guess))
+    init=[b[0]+xv*(b[1]-b[0]) for b,xv in zip(bounds,xguess)]
+    return((candx,candy,dx,dy,corner,com,init))
 
 def initialGuess(intensities,counts):
     '''Construct non-parametric guesses for distributions of two components and use these to estimate Gaussian parameters'''
