@@ -288,7 +288,7 @@ def checkPos(arr,ny,nx,pos0,dy,dx,theta=0,sampfrac=0.1):
     vals=[sampleArr(arr,p,(sx,sy)) for p in pos]
     return(sum(vals))
 
-def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,pdf=None,acmedian=True,rattol=0.1,glob=False,verbose=False,nsol=400):
+def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,pdf=None,acmedian=True,rattol=0.1,glob=False,verbose=False,nsol=1024):
     '''Automatically search for best estimate for location of culture array (based on culture centres, not top-left corner).'''
     # Generate windowed mean intensities, scanning along x and y axes
     # Estimate spot diameter, assuming grid takes up most of the plate
@@ -319,8 +319,8 @@ def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,p
         dmin=min(dy,dx)
         dy,dx=dmin,dmin
         
-    ry=arr.shape[0]-((ny-1)*dy)
-    rx=arr.shape[1]-((nx-1)*dx)
+    ry=arr.shape[0]-((ny)*dy)
+    rx=arr.shape[1]-((nx)*dx)
 
     checkvecs=[range(ry),range(rx)]
     checkpos=list(itertools.product(*checkvecs))
@@ -333,90 +333,119 @@ def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,p
     com=ndimage.measurements.center_of_mass(arr)
     com=[int(round(x)) for x in com]
 
-    bounds=[(0,ry),(0,rx),(0.8*max(dy,dx),1.2*max(dy,dx)),(-5,5)]
+    bounds=[(0,ry),(0,rx),(0.8*min(dy,dx),1.2*max(dy,dx)),(-5,5)]
 
-    def makeOpt(arr,ny,nx,bounds,sampfrac=0.40):
+    def makeOptAll(arr,ny,nx,bounds,sampfrac=0.35):
         def optfun(xvs):
             xrs=[b[0]+xv*(b[1]-b[0]) for b,xv in zip(bounds,xvs)]
             res=-1*checkPos(arr,ny,nx,xrs[0:2],xrs[2],xrs[2],xrs[3],sampfrac=sampfrac)
             return (res)
         return optfun
 
-    def makeOpt2(arr,ny,nx,dx_norm,theta_norm,bounds,sampfrac=0.40):
+    def makeOptPos(arr,ny,nx,dx_norm,theta_norm,bounds,sampfrac=0.35):
         dx=bounds[2][0]+dx_norm*(bounds[2][1]-bounds[2][0])
         theta=bounds[3][0]+theta_norm*(bounds[3][1]-bounds[3][0])
         def optfun(xvs):
-            xrs=[b[0]+xv*(b[1]-b[0]) for b,xv in zip(bounds,xvs)]
+            xrs=[b[0]+xv*(b[1]-b[0]) for b,xv in zip(bounds[0:2],xvs)]
             res=-1*checkPos(arr,ny,nx,xrs,dx,dx,theta,sampfrac=sampfrac)
             return (res)
         return optfun
 
-    opt1=makeOpt(arr,ny,nx,bounds)
-    xguess=list([0.5 for b in bounds])
-    nb=len(bounds)
-
     optmess=False
-    sol1=op.minimize(opt1,x0=xguess,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds],jac=False,options={'eps':0.005,'disp':optmess,'gtol':0.1})
-    bounds2=bounds[0:2]
-    opt2=makeOpt2(arr,ny,nx,sol1.x[2],sol1.x[3],bounds)
-    # For even sampling: nsol = Nsamps**Ndim
-    x0s=[sobol.i4_sobol(len(bounds2),i)[0] for i in range(nsol)]
-    x0s.append(xguess[0:2])
-    x0s.append(sol1.x[0:2])
-    firstpass=[opt2(x) for x in x0s]
-    firstguess=x0s[numpy.argmin(firstpass)]
-    sol2=op.minimize(opt2,x0=firstguess,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds2],jac=False,options={'eps':0.005,'disp':optmess,'gtol':0.1})
-    soln2=sol2.x
-    soln2=numpy.append(soln2,sol1.x[2:])
-    sol=op.minimize(opt1,x0=soln2,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds],jac=False,options={'eps':0.005,'disp':optmess,'gtol':0.1})
-    soln=[b[0]+xv*(b[1]-b[0]) for b,xv in zip(bounds,sol.x)]
 
-    pos0=soln[0:2]
-    dy,dx=soln[2],soln[2]    
-    theta=soln[3]
+    dx_norm=(min(dx,dy)-bounds[2][0])/(bounds[2][1]-bounds[2][0])
+    optpos=makeOptPos(arr,ny,nx,dx_norm,0.5,bounds)
+
+    # For even sampling: nsol = Nsamps**Ndim   
+    x0s=[sobol.i4_sobol(2,i)[0] for i in range(nsol)]
+    firstpass=[optpos(x) for x in x0s]
+    firstguess=x0s[numpy.argmin(firstpass)]
+
+    solpos=op.minimize(optpos,x0=firstguess,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds[0:2]],jac=False,options={'eps':0.005,'disp':optmess,'gtol':0.1})
+    solnpos=solpos.x
+    solnpos=numpy.append(solnpos,[dx_norm,0.5])
+
+##    soln=[b[0]+xv*(b[1]-b[0]) for b,xv in zip(bounds,solnpos)]
+##    candy,candx=grid(soln,ny,nx)
+##    plotAC(sumy,sumx,candy,candx,maximay,maximax)
+
+    optall=makeOptAll(arr,ny,nx,bounds)
+    xguess=list([0.5 for b in bounds])
+    
+    sol=op.minimize(optall,x0=solnpos,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds],jac=False,options={'eps':0.005,'disp':optmess,'gtol':0.1})
+    soln=[b[0]+xv*(b[1]-b[0]) for b,xv in zip(bounds,sol.x)]
+    
+##    x0s.append(xguess[0:2])
+##    x0s.append(sol1.x[0:2])
+##    firstpass=[optpos(x) for x in x0s]
+##    firstguess=x0s[numpy.argmin(firstpass)]
+##    sol2=op.minimize(optpos,x0=firstguess,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds[0:2]],jac=False,options={'eps':0.005,'disp':optmess,'gtol':0.1})
+##    soln2=sol2.x
+##    soln2=numpy.append(soln2,sol1.x[2:])
+##    sol=op.minimize(optall,x0=soln2,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds],jac=False,options={'eps':0.005,'disp':optmess,'gtol':0.1})
 
     if verbose:
         print("Optimisation: "+sol.message)
         print(sol)
-
-    grid=makeGrid(pos0,ny,nx,dy=dy,dx=dx,theta=theta)
-
-    candy,candx=list(zip(*grid))
+        
+    candy,candx=grid(soln,ny,nx)
 
     # Output some plots
     if showPlt:
-        fig,ax=plt.subplots(2,2,figsize=(15,15))
-        
-        ax[0,0].plot(sumx)
-        for cand in candx:
-            ax[0,0].axvline(x=cand,linestyle='--',linewidth=0.5,color="black")
-        ax[0,0].set_xlabel('x coordinate (px)')
-        ax[0,0].set_ylabel('Mean Intensity')
+        plotAC(sumy,sumx,candy,candx,maximay,maximax,pdf)
 
-        ax[0,1].plot(autocor(sumx))
-        for cand in maximax:
-            ax[0,1].axvline(x=cand,linestyle='--',linewidth=0.5,color="black")
-        ax[0,1].set_xlabel('Offset dx (px)')
-        ax[0,1].set_ylabel('Autocorrelation')
-            
-        ax[1,0].plot(sumy)
-        for cand in candy:
-            ax[1,0].axvline(x=cand,linestyle='--',linewidth=0.5,color="black")
-        ax[1,0].set_xlabel('y coordinate (px)')
-        ax[1,0].set_ylabel('Mean Intensity')
-
-        ax[1,1].plot(autocor(sumy))
-        for cand in maximay:
-            ax[1,1].axvline(x=cand,linestyle='--',linewidth=0.5,color="black")
-        ax[1,1].set_xlabel('Offset dy (px)')
-        ax[1,1].set_ylabel('Autocorrelation')
-        if pdf==None:
-            plt.show()
-        else:
-            pdf.savefig()
-            plt.close()
     init=[b[0]+xv*(b[1]-b[0]) for b,xv in zip(bounds,xguess)]
-    return((candx,candy,dx,dy,corner,com,init))
+    return((candx,candy,dx,dy,corner,com,init[0:2]))
+
+def grid(soln,ny,nx):
+    pos0=soln[0:2]
+    dy,dx=soln[2],soln[2]    
+    theta=soln[3]
+    grid=makeGrid(pos0,ny,nx,dy=dy,dx=dx,theta=theta)
+    candy,candx=list(zip(*grid))
+    return((candy,candx))
+
+def plotAC(sumy,sumx,candy,candx,maximay,maximax,pdf=None):
+    fig,ax=plt.subplots(2,2,figsize=(15,15))
+    acx=autocor(sumx)
+    acy=autocor(sumy)
+    acxmax=max(len(acx),len(acy))
+
+    ax[0,0].plot(sumx)
+    for cand in candx:
+        ax[0,0].axvline(x=cand,linestyle='--',linewidth=0.5,color="black")
+    ax[0,0].set_xlabel('x coordinate (px)')
+    ax[0,0].set_ylabel('Mean Intensity')
+
+    ax[0,1].plot(acx)
+    for cand in maximax:
+        ax[0,1].axvline(x=cand,linestyle='--',linewidth=0.5,color="black")
+    ax[0,1].set_xlabel('Offset dx (px)')
+    ax[0,1].set_ylabel('Autocorrelation')
+    ax[0,1].set_xlim([0,acxmax])
+        
+    ax[1,0].plot(sumy)
+    for cand in candy:
+        ax[1,0].axvline(x=cand,linestyle='--',linewidth=0.5,color="black")
+    ax[1,0].set_xlabel('y coordinate (px)')
+    ax[1,0].set_ylabel('Mean Intensity')
+
+    ax[1,1].plot(acy)
+    for cand in maximay:
+        ax[1,1].axvline(x=cand,linestyle='--',linewidth=0.5,color="black")
+    ax[1,1].set_xlabel('Offset dy (px)')
+    ax[1,1].set_ylabel('Autocorrelation')
+    ax[1,1].set_xlim([0,acxmax])
+    
+    if pdf==None:
+        plt.show()
+    else:
+        pdf.savefig()
+        plt.close()
+    return()
+    
+    
+    
 
 def initialGuess(intensities,counts):
     '''Construct non-parametric guesses for distributions of two components and use these to estimate Gaussian parameters'''

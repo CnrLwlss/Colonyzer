@@ -13,7 +13,7 @@ pdf=None
 
 acmedian=True
 rattol=0.1
-nsol=3
+nsol=400
 verbose=True
 
 # Generate windowed mean intensities, scanning along x and y axes
@@ -51,9 +51,6 @@ rx=arr.shape[1]-((nx-1)*dx)
 checkvecs=[range(ry),range(rx)]
 checkpos=list(itertools.product(*checkvecs))
 
-step=1.0
-
-ey,ex=ry/2,rx/2
 # Assume we can see the edges of the plate in the image (bright enough to make a peak in the smoothed intensities
 peaksy=numpy.where(numpy.diff(numpy.sign(numpy.diff(sumy)))==-2)[0]
 peaksx=numpy.where(numpy.diff(numpy.sign(numpy.diff(sumx)))==-2)[0]
@@ -62,55 +59,55 @@ corner=[peaksy[0],peaksx[0]]
 com=ndimage.measurements.center_of_mass(arr)
 com=[int(round(x)) for x in com]
 
-guess=[int(round(corner[0]+2*dy)),int(round(corner[1]+2*dx))]
-ey,ex=guess
+bounds=[(0,ry),(0,rx),(0.8*max(dy,dx),1.2*max(dy,dx)),(-5,5)]
 
-
-step=2.0
-bounds=[(step,ry),(step,rx),(0.9*max(dy,dx),1.1*max(dy,dx)),(-5,5)]
-
-def makeOpt(arr,ny,nx,bounds,sampfrac=0.40):
+def makeOptAll(arr,ny,nx,bounds,sampfrac=0.35):
     def optfun(xvs):
         xrs=[b[0]+xv*(b[1]-b[0]) for b,xv in zip(bounds,xvs)]
         res=-1*checkPos(arr,ny,nx,xrs[0:2],xrs[2],xrs[2],xrs[3],sampfrac=sampfrac)
         return (res)
     return optfun
 
-def makeOpt2(arr,ny,nx,dx_norm,theta_norm,bounds,sampfrac=0.40):
+def makeOptPos(arr,ny,nx,dx_norm,theta_norm,bounds,sampfrac=0.35):
     dx=bounds[2][0]+dx_norm*(bounds[2][1]-bounds[2][0])
     theta=bounds[3][0]+theta_norm*(bounds[3][1]-bounds[3][0])
     def optfun(xvs):
-        xrs=[b[0]+xv*(b[1]-b[0]) for b,xv in zip(bounds,xvs)]
+        xrs=[b[0]+xv*(b[1]-b[0]) for b,xv in zip(bounds[0:2],xvs)]
         res=-1*checkPos(arr,ny,nx,xrs,dx,dx,theta,sampfrac=sampfrac)
         return (res)
     return optfun
 
-opt1=makeOpt(arr,ny,nx,bounds)
+
+optmess=False
+
+dx_norm=max(dx,dy)/(bounds[2][1]-bounds[2][0])
+optpos=makeOptPos(arr,ny,nx,dx_norm,0.5,bounds)
+
+# For even sampling: nsol = Nsamps**Ndim   
+x0s=[sobol.i4_sobol(2,i)[0] for i in range(nsol)]
+firstpass=[optpos(x) for x in x0s]
+firstguess=x0s[numpy.argmin(firstpass)]
+
+solpos=op.minimize(optpos,x0=firstguess,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds[0:2]],jac=False,options={'eps':0.005,'disp':optmess,'gtol':0.1})
+solnpos=solpos.x
+solnpos=numpy.append(solnpos,[dx_norm,0.5])
+
+optall=makeOptAll(arr,ny,nx,bounds)
 xguess=list([0.5 for b in bounds])
-nb=len(bounds)
 
-sol1=op.minimize(opt1,x0=xguess,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds],jac=False,options={'eps':0.005,'disp':True,'factr':1e7,'gtol':0.1})
+sol=op.minimize(optall,x0=solnpos,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds],jac=False,options={'eps':0.005,'disp':optmess,'gtol':0.1})
+soln=[b[0]+xv*(b[1]-b[0]) for b,xv in zip(bounds,sol.x)]
 
-if nsol==1:
-    sol=sol1
-    soln=[b[0]+xv*(b[1]-b[0]) for b,xv in zip(bounds,sol1.x)]
-else:
-    if verbose: print("Trying global optimisation of grid location, using Sobol sequence.")
-    import sobol
-    # For even sampling: nsol = Nsamps**Ndim
-    bounds2=bounds[0:2]
-    opt2=makeOpt2(arr,ny,nx,sol1.x[2],sol1.x[3],bounds)
-    nsol=20**len(bounds2)
-    x0s=[sobol.i4_sobol(len(bounds2),i)[0] for i in range(nsol)]
-    x0s.append(xguess[0:2])
-    x0s.append(sol1.x[0:2])
-    firstpass=[opt2(x) for x in x0s]
-    firstguess=x0s[numpy.argmin(firstpass)]
-    sol2=op.minimize(opt2,x0=firstguess,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds2],jac=False,options={'eps':0.005,'disp':True,'factr':1e7,'gtol':0.1})
-    soln2=sol2.x
-    soln2=numpy.append(soln2,sol1.x[2:])
-    sol=op.minimize(opt1,x0=soln2,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds],jac=False,options={'eps':0.005,'disp':True,'factr':1e7,'gtol':0.1})
-    soln=[b[0]+xv*(b[1]-b[0]) for b,xv in zip(bounds,sol.x)]
+
+##    x0s.append(xguess[0:2])
+##    x0s.append(sol1.x[0:2])
+##    firstpass=[optpos(x) for x in x0s]
+##    firstguess=x0s[numpy.argmin(firstpass)]
+##    sol2=op.minimize(optpos,x0=firstguess,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds[0:2]],jac=False,options={'eps':0.005,'disp':optmess,'gtol':0.1})
+##    soln2=sol2.x
+##    soln2=numpy.append(soln2,sol1.x[2:])
+##    sol=op.minimize(optall,x0=soln2,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds],jac=False,options={'eps':0.005,'disp':optmess,'gtol':0.1})
+
 
 pos0=soln[0:2]
 dy,dx=soln[2],soln[2]    
@@ -156,3 +153,4 @@ if showPlt:
     else:
         pdf.savefig()
         plt.close()
+init=[b[0]+xv*(b[1]-b[0]) for b,xv in zip(bounds,xguess)]
