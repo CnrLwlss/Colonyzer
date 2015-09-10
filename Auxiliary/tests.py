@@ -13,9 +13,10 @@ pdf=None
 
 acmedian=True
 rattol=0.1
-nsol=400
+nsol=36
 verbose=True
 
+'''Automatically search for best estimate for location of culture array (based on culture centres, not top-left corner).'''
 # Generate windowed mean intensities, scanning along x and y axes
 # Estimate spot diameter, assuming grid takes up most of the plate
 diam=min(float(arr.shape[0])/ny,float(arr.shape[1])/nx)
@@ -45,8 +46,8 @@ if rat > (rattol+1.0) or rat < 1.0/(rattol+1.0):
     dmin=min(dy,dx)
     dy,dx=dmin,dmin
     
-ry=arr.shape[0]-((ny-1)*dy)
-rx=arr.shape[1]-((nx-1)*dx)
+ry=arr.shape[0]-((ny)*dy)
+rx=arr.shape[1]-((nx)*dx)
 
 checkvecs=[range(ry),range(rx)]
 checkpos=list(itertools.product(*checkvecs))
@@ -59,7 +60,7 @@ corner=[peaksy[0],peaksx[0]]
 com=ndimage.measurements.center_of_mass(arr)
 com=[int(round(x)) for x in com]
 
-bounds=[(0,ry),(0,rx),(0.8*max(dy,dx),1.2*max(dy,dx)),(-5,5)]
+bounds=[(0,ry),(0,rx),(0.8*min(dy,dx),1.2*max(dy,dx)),(-5,5)]
 
 def makeOptAll(arr,ny,nx,bounds,sampfrac=0.35):
     def optfun(xvs):
@@ -77,27 +78,31 @@ def makeOptPos(arr,ny,nx,dx_norm,theta_norm,bounds,sampfrac=0.35):
         return (res)
     return optfun
 
-
 optmess=False
 
-dx_norm=max(dx,dy)/(bounds[2][1]-bounds[2][0])
+dx_norm=(min(dx,dy)-bounds[2][0])/(bounds[2][1]-bounds[2][0])
 optpos=makeOptPos(arr,ny,nx,dx_norm,0.5,bounds)
 
 # For even sampling: nsol = Nsamps**Ndim   
 x0s=[sobol.i4_sobol(2,i)[0] for i in range(nsol)]
 firstpass=[optpos(x) for x in x0s]
-firstguess=x0s[numpy.argmin(firstpass)]
+#firstguess=x0s[numpy.argmin(firstpass)]
+firstsol=[op.minimize(optpos,x0=x,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds[0:2]],jac=False,options={'eps':0.01,'disp':optmess,'gtol':0.1,'maxiter':3}) for x in x0s]
+solpos=firstsol[numpy.argmin([sol.fun for sol in firstsol])]
 
-solpos=op.minimize(optpos,x0=firstguess,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds[0:2]],jac=False,options={'eps':0.005,'disp':optmess,'gtol':0.1})
+#solpos=op.minimize(optpos,x0=firstguess,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds[0:2]],jac=False,options={'eps':0.005,'disp':optmess,'gtol':0.1})
 solnpos=solpos.x
 solnpos=numpy.append(solnpos,[dx_norm,0.5])
+
+soln=[b[0]+xv*(b[1]-b[0]) for b,xv in zip(bounds,solnpos)]
+candy,candx=grid(soln,ny,nx)
+plotAC(sumy,sumx,candy,candx,maximay,maximax)
 
 optall=makeOptAll(arr,ny,nx,bounds)
 xguess=list([0.5 for b in bounds])
 
-sol=op.minimize(optall,x0=solnpos,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds],jac=False,options={'eps':0.005,'disp':optmess,'gtol':0.1})
+sol=op.minimize(optall,x0=solnpos,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds],jac=False,options={'eps':0.001,'disp':optmess,'gtol':0.1})
 soln=[b[0]+xv*(b[1]-b[0]) for b,xv in zip(bounds,sol.x)]
-
 
 ##    x0s.append(xguess[0:2])
 ##    x0s.append(sol1.x[0:2])
@@ -108,49 +113,14 @@ soln=[b[0]+xv*(b[1]-b[0]) for b,xv in zip(bounds,sol.x)]
 ##    soln2=numpy.append(soln2,sol1.x[2:])
 ##    sol=op.minimize(optall,x0=soln2,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds],jac=False,options={'eps':0.005,'disp':optmess,'gtol':0.1})
 
-
-pos0=soln[0:2]
-dy,dx=soln[2],soln[2]    
-theta=soln[3]
-
 if verbose:
     print("Optimisation: "+sol.message)
     print(sol)
-
-grid=makeGrid(pos0,ny,nx,dy=dy,dx=dx,theta=theta)
-
-candy,candx=list(zip(*grid))
+    
+candy,candx=grid(soln,ny,nx)
 
 # Output some plots
 if showPlt:
-    fig,ax=plt.subplots(2,2,figsize=(15,15))
-    
-    ax[0,0].plot(sumx)
-    for cand in candx:
-        ax[0,0].axvline(x=cand,linestyle='--',linewidth=0.5,color="black")
-    ax[0,0].set_xlabel('x coordinate (px)')
-    ax[0,0].set_ylabel('Mean Intensity')
+    plotAC(sumy,sumx,candy,candx,maximay,maximax,pdf)
 
-    ax[0,1].plot(autocor(sumx))
-    for cand in maximax:
-        ax[0,1].axvline(x=cand,linestyle='--',linewidth=0.5,color="black")
-    ax[0,1].set_xlabel('Offset dx (px)')
-    ax[0,1].set_ylabel('Autocorrelation')
-        
-    ax[1,0].plot(sumy)
-    for cand in candy:
-        ax[1,0].axvline(x=cand,linestyle='--',linewidth=0.5,color="black")
-    ax[1,0].set_xlabel('y coordinate (px)')
-    ax[1,0].set_ylabel('Mean Intensity')
-
-    ax[1,1].plot(autocor(sumy))
-    for cand in maximay:
-        ax[1,1].axvline(x=cand,linestyle='--',linewidth=0.5,color="black")
-    ax[1,1].set_xlabel('Offset dy (px)')
-    ax[1,1].set_ylabel('Autocorrelation')
-    if pdf==None:
-        plt.show()
-    else:
-        pdf.savefig()
-        plt.close()
 init=[b[0]+xv*(b[1]-b[0]) for b,xv in zip(bounds,xguess)]

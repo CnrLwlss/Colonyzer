@@ -7,7 +7,8 @@ import os
 import time
 import numpy
 import itertools
-from matplotlib.backends.backend_pdf import PdfPages
+from matplotlib.backends.backend_pdf import PdfPages, FigureCanvasPdf
+from matplotlib import figure
 from PIL import Image,ImageDraw
 
 def checkImages(fdir,fdict=None,barcRange=(0,-24),verbose=False):
@@ -40,10 +41,9 @@ def parseArgs(inp=''):
     parser.add_argument("-l","--logsdir", type=str, help="Directory in which to search for JSON files listing images for analyis (e.g. LOGS3, root of HTS filestore).  Only used when intending to specify images for analysis in .json file (see -u).",default=".")
     parser.add_argument("-f","--fixthresh", type=float, help="Image segmentation threshold value (default is automatic thresholding).")
     parser.add_argument("-u","--usedict", type=str, help="Load .json file specifying images to analyse.  If argument has a .json extension, treat as filename.  Otherwise assume argument is a HTS-style screen ID and return path to appropriate .json file from directory structure.  See C2Find.py in HTSauto package.")
-    parser.add_argument("-o","--fmt", type=str, nargs='+', help="Specify rectangular grid format, either using integer shorthand (e.g. -o 96, -o 384, -o 768 -o 1536) or explicitly specify number of rows followed by number of columns (e.g.: -o 24 16 or -o 24x16)", default=['384'])
-    #parser.add_argument("-","--fmt", type=str, nargs='+', help="Specify rectangular grid format, either using integer shorthand (e.g. -o 96, -o 384, -o 768 -o 1536) or explicitly specify number of rows followed by number of columns (e.g.: -o 24 16 or -o 24x16)", default=['384'])
+    parser.add_argument("-o","--fmt", type=str, nargs='+', help="Specify rectangular grid format, either using integer shorthand (e.g. -o 96, -o 384, -o 768 -o 1536) or explicitly specify number of rows followed by number of columns (e.g.: -o 24 16 or -o 24x16).", default=['384'])
+    parser.add_argument("-t","--updates", type=int, help="Number of (quasi-)randomly distributed grid positions to assess in first phase of grid location.  Ignored when -initpos specified.", default=64)
     
-
     if inp=="":
         args = parser.parse_args()
     else:
@@ -76,6 +76,7 @@ def buildVars(inp=''):
         nrow,ncol=c2.parsePlateFormat(inp.fmt[0])
     else:
         nrow,ncol=[int(x) for x in inp.fmt]
+    print("Expecting {} rows and {} columns on plate.".format(nrow,ncol))
     
     if inp.usedict is None:
         fdict=None    
@@ -105,6 +106,7 @@ def buildVars(inp=''):
             print("Using user-specified initial guess for colony locations.  NOTE: Colonyzer.txt file must be located in directory with images to be analysed.  See Parametryzer for more information.")
         else:
             print("Searching for colony locations automatically.")
+            print("Checking "+str(inp.updates)+" (quasi-random) candidate grid positions in first phase of grid location")
         cut=False
         if inp.lc:
             if inp.cut:
@@ -118,7 +120,7 @@ def buildVars(inp=''):
             print("Images will be segmented using fixed threshold: "+str(fixedThresh)+".")
         if fdict is not None and os.path.exists(fdict):
             print("Preparing to load barcodes from "+fdict+".")
-    res={'lc':inp.lc,'fixedThresh':fixedThresh,'plots':inp.plots,'initpos':inp.initpos,'fdict':fdict,'fdir':fdir,'nrow':nrow,'ncol':ncol,'cut':cut,'verbose':verbose,'diffims':diffIms}
+    res={'lc':inp.lc,'fixedThresh':fixedThresh,'plots':inp.plots,'initpos':inp.initpos,'fdict':fdict,'fdir':fdir,'nrow':nrow,'ncol':ncol,'cut':cut,'verbose':verbose,'diffims':diffIms,'updates':inp.updates}
     return(res)
 
 def locateJSON(scrID,dirHTS='.',verbose=False):
@@ -131,7 +133,6 @@ def prepareTimecourse(barcdict,verbose=False):
     BARCs=sorted(barcdict)
     BARCODE=BARCs[0]
     imdir=os.path.dirname(barcdict[BARCODE][0])
-    InsData=c2.readInstructions(imdir)
     IMs=barcdict[BARCODE]
     LATESTIMAGE=IMs[0]
     EARLIESTIMAGE=IMs[-1]
@@ -140,7 +141,7 @@ def prepareTimecourse(barcdict,verbose=False):
         print("Analysing images labelled with the barcode "+BARCODE+" in "+imdir)
         print("Earliest image: "+EARLIESTIMAGE)
         print("Latest image: "+LATESTIMAGE)
-    return((BARCODE,imdir,InsData,LATESTIMAGE,EARLIESTIMAGE,imRoot))
+    return((BARCODE,imdir,LATESTIMAGE,EARLIESTIMAGE,imRoot))
 
 def loadLocationGuesses(IMAGE,InsData):
     '''Set up initial guesses for location of (centres of) spots on image by parsing data from Colonyzer.txt'''
@@ -180,7 +181,7 @@ def main(inp=""):
     cythonFill=False
 
     var=buildVars(inp=inp)
-    correction,fixedThresh,plots,initpos,fdict,fdir,nrow,ncol,cut,verbose,diffIms=(var["lc"],var["fixedThresh"],var["plots"],var["initpos"],var["fdict"],var["fdir"],var["nrow"],var["ncol"],var["cut"],var["verbose"],var["diffims"])
+    correction,fixedThresh,plots,initpos,fdict,fdir,nrow,ncol,cut,verbose,diffIms,updates=(var["lc"],var["fixedThresh"],var["plots"],var["initpos"],var["fdict"],var["fdir"],var["nrow"],var["ncol"],var["cut"],var["verbose"],var["diffims"],var["updates"])
     barcdict=checkImages(fdir,fdict,verbose=verbose)
     rept=c2.setupDirectories(barcdict,verbose=verbose)
 
@@ -188,7 +189,7 @@ def main(inp=""):
 
     while len(barcdict)>0:
 
-        BARCODE,imdir,InsData,LATESTIMAGE,EARLIESTIMAGE,imRoot=prepareTimecourse(barcdict,verbose=verbose)  
+        BARCODE,imdir,LATESTIMAGE,EARLIESTIMAGE,imRoot=prepareTimecourse(barcdict,verbose=verbose)  
 
         if plots:
             pdf=PdfPages(os.path.join(os.path.dirname(EARLIESTIMAGE),"Output_Reports",os.path.basename(EARLIESTIMAGE).split(".")[0]+".pdf"))
@@ -207,12 +208,16 @@ def main(inp=""):
             im0,arr0=c2.openImage(EARLIESTIMAGE)
 
         if initpos:
+            InsData=c2.readInstructions(os.path.dirname(LATESTIMAGE))
             # Load initial guesses from Colonyzer.txt file
             (candx,candy,dx,dy)=loadLocationGuesses(LATESTIMAGE,InsData)
             corner=[0,0]; com=[0,0]; guess=[0,0]
+            # NOTE: assumes that grid returned by loadLocationGuesses is parallel to image edges
+            ny=nrow=len(numpy.unique(candy)) 
+            nx=ncol=len(numpy.unique(candx))
         else:
             # Automatically generate guesses for gridded array locations
-            (candx,candy,dx,dy,corner,com,guess)=c2.estimateLocations(arrN,ncol,nrow,showPlt=plots,pdf=pdf,glob=False,verbose=verbose)
+            (candx,candy,dx,dy,corner,com,guess)=c2.estimateLocations(arrN,ncol,nrow,showPlt=plots,pdf=pdf,glob=False,verbose=verbose,nsol=updates)
 
         # Update guesses and initialise locations data frame
         locationsN=c2.locateCultures([int(round(cx-dx/2.0)) for cx in candx],[int(round(cy-dy/2.0)) for cy in candy],dx,dy,arrN,ncol,nrow,update=True)

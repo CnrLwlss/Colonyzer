@@ -33,8 +33,10 @@ def readInstructions(fullpath,fname='Colonyzer.txt'):
                 if len(tlist)==6 and tlist[0]=='default':
                     defaultArr.append([tlist[1],int(tlist[2]),int(tlist[3]),int(tlist[4]),int(tlist[5]),"0000-01-01"])
                 # Capturing array of default calibrations together with dates of change (corresponding to dates cameras moved)
-                if len(tlist)==7 and tlist[0]=='default':
+                elif len(tlist)==7 and tlist[0]=='default':
                     defaultArr.append([tlist[1],int(tlist[2]),int(tlist[3]),int(tlist[4]),int(tlist[5]),tlist[6].rstrip()])
+                else:
+                    InsData[tlist[0]]=[tlist[1]]+[int(t.rstrip()) for t in tlist[2:]]
         InsData['default']=defaultArr
     return(InsData)
 
@@ -109,12 +111,11 @@ def SetUp(instructarr,imageDate=""):
 
     # Parameter for specifying the search area (area is (NSearch*2+1)^2)
     NSearch = int(round(3.0*float(min(xdim,ydim))/8.0))
-    print ("Instructions: ",xstart,ystart,xdim,ydim,NSearch)
     candx,candy=[],[]
     for ROW in range(norows):
-        candy.append(int(round(ystart+ydimf/2.0+float(ROW)*ydimf)))
-    for COL in range(nocols):
-        candx.append(int(round(xstart+xdimf/2.0+float(COL)*xdimf)))
+        for COL in range(nocols):
+            candy.append(int(round(ystart+ydimf/2.0+float(ROW)*ydimf)))
+            candx.append(int(round(xstart+xdimf/2.0+float(COL)*xdimf)))
     return((candx,candy,xdim,ydim))
 
 def contiguous_regions(condition):
@@ -288,7 +289,7 @@ def checkPos(arr,ny,nx,pos0,dy,dx,theta=0,sampfrac=0.1):
     vals=[sampleArr(arr,p,(sx,sy)) for p in pos]
     return(sum(vals))
 
-def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,pdf=None,acmedian=True,rattol=0.1,glob=False,verbose=False,nsol=1024):
+def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,pdf=None,acmedian=True,rattol=0.1,glob=False,verbose=False,nsol=256):
     '''Automatically search for best estimate for location of culture array (based on culture centres, not top-left corner).'''
     # Generate windowed mean intensities, scanning along x and y axes
     # Estimate spot diameter, assuming grid takes up most of the plate
@@ -297,8 +298,8 @@ def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,p
     sumx=numpy.array([numpy.mean(arr[0:arr.shape[0],numpy.max([0,dx-window]):numpy.min([arr.shape[1],dx+window])]) for dx in range(0,arr.shape[1])],dtype=numpy.float)
     sumy=numpy.array([numpy.mean(arr[numpy.max([0,dy-window]):numpy.min([arr.shape[0],dy+window]),0:arr.shape[1]]) for dy in range(0,arr.shape[0])],dtype=numpy.float)
     # Smooth intensities to help eliminate small local maxima
-    sumx=ndimage.gaussian_filter1d(sumx,2.5)
-    sumy=ndimage.gaussian_filter1d(sumy,2.5)
+    #sumx=ndimage.gaussian_filter1d(sumx,2.5)
+    #sumy=ndimage.gaussian_filter1d(sumy,2.5)
 
     # Look at autocorrelation for first estimate of distance between spots
     maximay=numpy.where(numpy.diff(numpy.sign(numpy.diff(autocor(sumy))))==-2)[0]
@@ -333,7 +334,7 @@ def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,p
     com=ndimage.measurements.center_of_mass(arr)
     com=[int(round(x)) for x in com]
 
-    bounds=[(0,ry),(0,rx),(0.8*min(dy,dx),1.2*max(dy,dx)),(-5,5)]
+    bounds=[(peaksy[0]+dy,ry),(peaksx[0]+dx,rx),(0.8*min(dy,dx),1.2*max(dy,dx)),(-5,5)]
 
     def makeOptAll(arr,ny,nx,bounds,sampfrac=0.35):
         def optfun(xvs):
@@ -359,40 +360,41 @@ def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,p
     # For even sampling: nsol = Nsamps**Ndim   
     x0s=[sobol.i4_sobol(2,i)[0] for i in range(nsol)]
     firstpass=[optpos(x) for x in x0s]
-    firstguess=x0s[numpy.argmin(firstpass)]
+    #firstguess=x0s[numpy.argmin(firstpass)]
+    firstsol=[op.minimize(optpos,x0=x,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds[0:2]],jac=False,options={'eps':0.01,'disp':optmess,'gtol':0.1,'maxiter':3}) for x in x0s]
+    solpos=firstsol[numpy.argmin([sol.fun for sol in firstsol])]
 
-    solpos=op.minimize(optpos,x0=firstguess,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds[0:2]],jac=False,options={'eps':0.005,'disp':optmess,'gtol':0.1})
+    #solpos=op.minimize(optpos,x0=firstguess,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds[0:2]],jac=False,options={'eps':0.005,'disp':optmess,'gtol':0.1})
     solnpos=solpos.x
     solnpos=numpy.append(solnpos,[dx_norm,0.5])
 
-##    soln=[b[0]+xv*(b[1]-b[0]) for b,xv in zip(bounds,solnpos)]
-##    candy,candx=grid(soln,ny,nx)
-##    plotAC(sumy,sumx,candy,candx,maximay,maximax)
+    soln=[b[0]+xv*(b[1]-b[0]) for b,xv in zip(bounds,solnpos)]
+    candy,candx=grid(soln,ny,nx)
+    plotAC(sumy,sumx,candy,candx,maximay,maximax,pdf=pdf,main="First pass")
 
     optall=makeOptAll(arr,ny,nx,bounds)
     xguess=list([0.5 for b in bounds])
-    
-    sol=op.minimize(optall,x0=solnpos,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds],jac=False,options={'eps':0.005,'disp':optmess,'gtol':0.1})
+
+    sol=op.minimize(optall,x0=solnpos,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds],jac=False,options={'eps':0.001,'disp':optmess,'gtol':0.1})
     soln=[b[0]+xv*(b[1]-b[0]) for b,xv in zip(bounds,sol.x)]
-    
-##    x0s.append(xguess[0:2])
-##    x0s.append(sol1.x[0:2])
-##    firstpass=[optpos(x) for x in x0s]
-##    firstguess=x0s[numpy.argmin(firstpass)]
-##    sol2=op.minimize(optpos,x0=firstguess,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds[0:2]],jac=False,options={'eps':0.005,'disp':optmess,'gtol':0.1})
-##    soln2=sol2.x
-##    soln2=numpy.append(soln2,sol1.x[2:])
-##    sol=op.minimize(optall,x0=soln2,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds],jac=False,options={'eps':0.005,'disp':optmess,'gtol':0.1})
+
+    ##    x0s.append(xguess[0:2])
+    ##    x0s.append(sol1.x[0:2])
+    ##    firstpass=[optpos(x) for x in x0s]
+    ##    firstguess=x0s[numpy.argmin(firstpass)]
+    ##    sol2=op.minimize(optpos,x0=firstguess,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds[0:2]],jac=False,options={'eps':0.005,'disp':optmess,'gtol':0.1})
+    ##    soln2=sol2.x
+    ##    soln2=numpy.append(soln2,sol1.x[2:])
+    ##    sol=op.minimize(optall,x0=soln2,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds],jac=False,options={'eps':0.005,'disp':optmess,'gtol':0.1})
 
     if verbose:
-        print("Optimisation: "+sol.message)
-        print(sol)
+        print("Optimisation: "+sol.message+"\n\n")
         
     candy,candx=grid(soln,ny,nx)
 
     # Output some plots
     if showPlt:
-        plotAC(sumy,sumx,candy,candx,maximay,maximax,pdf)
+        plotAC(sumy,sumx,candy,candx,maximay,maximax,pdf=pdf,main="Solution")
 
     init=[b[0]+xv*(b[1]-b[0]) for b,xv in zip(bounds,xguess)]
     return((candx,candy,dx,dy,corner,com,init[0:2]))
@@ -405,7 +407,7 @@ def grid(soln,ny,nx):
     candy,candx=list(zip(*grid))
     return((candy,candx))
 
-def plotAC(sumy,sumx,candy,candx,maximay,maximax,pdf=None):
+def plotAC(sumy,sumx,candy,candx,maximay,maximax,pdf=None,main=""):
     fig,ax=plt.subplots(2,2,figsize=(15,15))
     acx=autocor(sumx)
     acy=autocor(sumy)
@@ -416,6 +418,7 @@ def plotAC(sumy,sumx,candy,candx,maximay,maximax,pdf=None):
         ax[0,0].axvline(x=cand,linestyle='--',linewidth=0.5,color="black")
     ax[0,0].set_xlabel('x coordinate (px)')
     ax[0,0].set_ylabel('Mean Intensity')
+    ax[0,0].set_title(main)
 
     ax[0,1].plot(acx)
     for cand in maximax:
@@ -423,12 +426,14 @@ def plotAC(sumy,sumx,candy,candx,maximay,maximax,pdf=None):
     ax[0,1].set_xlabel('Offset dx (px)')
     ax[0,1].set_ylabel('Autocorrelation')
     ax[0,1].set_xlim([0,acxmax])
+    ax[0,1].set_title(main)
         
     ax[1,0].plot(sumy)
     for cand in candy:
         ax[1,0].axvline(x=cand,linestyle='--',linewidth=0.5,color="black")
     ax[1,0].set_xlabel('y coordinate (px)')
     ax[1,0].set_ylabel('Mean Intensity')
+    ax[1,0].set_title(main)
 
     ax[1,1].plot(acy)
     for cand in maximay:
@@ -436,6 +441,7 @@ def plotAC(sumy,sumx,candy,candx,maximay,maximax,pdf=None):
     ax[1,1].set_xlabel('Offset dy (px)')
     ax[1,1].set_ylabel('Autocorrelation')
     ax[1,1].set_xlim([0,acxmax])
+    ax[1,1].set_title(main)
     
     if pdf==None:
         plt.show()
