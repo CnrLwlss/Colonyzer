@@ -289,6 +289,17 @@ def checkPos(arr,ny,nx,pos0,dy,dx,theta=0,sampfrac=0.1):
     vals=[sampleArr(arr,p,(sx,sy)) for p in pos]
     return(sum(vals))
 
+def fitProjection(proj,delt,n,sp=0.0,st=0.0):
+    '''Find grid position that best fits a 1D projection of intensity by brute force'''
+    checkinds=range(int(round(delt/2.0)),int(round(len(proj)-delt*n)))
+    def getObj(i,proj,sp,st):
+        peaks=proj[i:int(round((i+delt*n))):int(round(delt))]
+        troughs=proj[int(round((i-delt/2.0))):int(round((i+delt*(n+0.5)))):int(round(delt))]
+        return(numpy.median(peaks)-numpy.median(troughs)-sp*numpy.std(peaks)-st*numpy.std(troughs))
+    grds=[getObj(i,proj,sp,st) for i in checkinds]
+    maxind=numpy.argmax(grds)
+    return((checkinds[maxind],grds[maxind]))
+
 def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,pdf=None,acmedian=True,rattol=0.1,glob=False,verbose=False,nsol=256):
     '''Automatically search for best estimate for location of culture array (based on culture centres, not top-left corner).'''
     # Generate windowed mean intensities, scanning along x and y axes
@@ -316,13 +327,39 @@ def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,p
     # Some plate inoculation patterns (e.g. alternate columns of fit and sick strains in miniQFA) break this ACF procedure (skip every second column)
     # However, the row ACF estimate is still robust.  In the case of disagreement, choose the smallest value
     rat=float(dy)/float(dx)
-    if rat > (rattol+1.0) or rat < 1.0/(rattol+1.0):
-        dmin=min(dy,dx)
-        dy,dx=dmin,dmin
+    #if rat > (rattol+1.0) or rat < 1.0/(rattol+1.0):
+    dmin=min(dy,dx)
+    dy,dx=dmin,dmin
         
-    ry=arr.shape[0]-((ny)*dy)
-    rx=arr.shape[1]-((nx)*dx)
+    ry=arr.shape[0]-ny*dy
+    rx=arr.shape[1]-nx*dx
 
+    #xvals=[fitProjection(sumx,int(round(dxval)),nx) for dxval in numpy.linspace(0.95*dx,min(int(round(arr.shape[1]/nx))-1,1.05*dx),100)]
+    #yvals=[fitProjection(sumy,int(round(dyval)),ny) for dyval in numpy.linspace(0.95*dy,min(int(round(arr.shape[0]/ny))-1,1.05*dy),100)]
+    dd=int(round(0.01*dx))
+    dd=1
+    xtest=range(dx-dd,min(int(round(arr.shape[1]/nx))-1,dx+dd))
+    ytest=range(dy-dd,min(int(round(arr.shape[0]/ny))-1,dy+dd))
+    #xtest=numpy.linspace(dx-dd,min(int(round(arr.shape[1]/nx))-1,dx+dd),20)
+    #ytest=numpy.linspace(dy-dd,min(int(round(arr.shape[0]/ny))-1,dy+dd),20)
+    xvals=[fitProjection(sumx,int(round(dxval)),nx,1,1) for dxval in xtest]
+    yvals=[fitProjection(sumy,int(round(dyval)),ny,1,1) for dyval in ytest]
+    xind=numpy.argmin([x[1] for x in xvals])
+    yind=numpy.argmin([y[1] for y in yvals])
+
+    xbest=xvals[xind][0]
+    dx=xtest[xind]
+    ybest=yvals[yind][0]
+    dy=ytest[yind]
+
+    #xbest=fitProjection(sumx,dx,nx,1,1)[0]
+    #ybest=fitProjection(sumy,dy,ny,1,1)[0]
+
+    grd=makeGrid((ybest,xbest),ny,nx,dy=dy,dx=dx,theta=0)
+    candy,candx=list(zip(*grd))
+    plotAC(sumy,sumx,candy,candx,maximay,maximax,pdf=pdf,main="Projection Estimate")
+
+    
     checkvecs=[range(ry),range(rx)]
     checkpos=list(itertools.product(*checkvecs))
 
