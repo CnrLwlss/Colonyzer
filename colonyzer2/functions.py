@@ -371,7 +371,8 @@ def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,p
     com=ndimage.measurements.center_of_mass(arr)
     com=[int(round(x)) for x in com]
 
-    bounds=[(peaksy[0]+dy,ry),(peaksx[0]+dx,rx),(0.8*min(dy,dx),1.2*max(dy,dx)),(-5,5)]
+    #bounds=[(peaksy[0]+dy,ry),(peaksx[0]+dx,rx),(0.8*min(dy,dx),1.2*max(dy,dx)),(-5,5)]
+    bounds=[(ybest-dy,ybest+dy),(xbest-dx,xbest+dx),(0.8*min(dy,dx),1.2*max(dy,dx)),(-5,5)]
 
     def makeOptAll(arr,ny,nx,bounds,sampfrac=0.35):
         def optfun(xvs):
