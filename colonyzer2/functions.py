@@ -286,8 +286,18 @@ def checkPos(arr,ny,nx,pos0,dy,dx,theta=0,sampfrac=0.1):
     sx=int(round(dx*sampfrac))
     sy=int(round(dy*sampfrac))
     pos=makeGrid(pos0,ny,nx,dy,dx,theta)
-    vals=[sampleArr(arr,p,(sx,sy)) for p in pos]
-    return(sum(vals))
+    gap=makeGrid((int(round(pos0[0]+dy/2.0)),int(round(pos0[1]+dx/2.0))),ny-1,nx-1,dy,dx,theta)
+    posvals=[sampleArr(arr,p,(sx,sy)) for p in pos]
+    gapvals=[sampleArr(arr,p,(sx,sy)) for g in gap]
+    return(float(sum(posvals))/len(posvals)-float(sum(gapvals))/len(gapvals))
+
+def checkPoints(arr,ny,nx,pos0,dy,dx,theta=0):
+    '''Return pixel intensities at grid points in (typically smoothed) 2D array'''
+    pos=list(zip(*makeGrid(pos0,ny,nx,dy,dx,theta)))
+    gap=list(zip(*makeGrid((int(round(pos0[0]+dy/2.0)),int(round(pos0[1]+dx/2.0))),ny-1,nx-1,dy,dx,theta)))
+    posvals=arr[pos[0],pos[1]]
+    gapvals=arr[gap[0],gap[1]]
+    return(numpy.mean(posvals)-numpy.mean(gapvals))
 
 def fitProjection(proj,delt,n,sp=0.0,st=0.0):
     '''Find grid position that best fits a 1D projection of intensity by brute force'''
@@ -300,7 +310,7 @@ def fitProjection(proj,delt,n,sp=0.0,st=0.0):
     maxind=numpy.argmax(grds)
     return((checkinds[maxind],grds[maxind]))
 
-def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,pdf=None,acmedian=True,rattol=0.1,glob=False,verbose=False,nsol=256):
+def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,pdf=None,acmedian=True,rattol=0.1,glob=False,verbose=False,nsol=36):
     '''Automatically search for best estimate for location of culture array (based on culture centres, not top-left corner).'''
     # Generate windowed mean intensities, scanning along x and y axes
     # Estimate spot diameter, assuming grid takes up most of the plate
