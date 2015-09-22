@@ -1,14 +1,15 @@
 import os,numpy,itertools
 from colonyzer2 import *
 from scipy import optimize as op
-from scipy import ndimage as nd
+from scipy import ndimage
 
-LATESTIMAGE=os.path.realpath("Data\\endpoints\\384\\DLR00012647-2009-07-04_09-35-20.jpg")
+#LATESTIMAGE=os.path.realpath("Data\\endpoints\\384\\DLR00012647-2009-07-04_09-35-20.jpg")
 #LATESTIMAGE=os.path.realpath("F:\\Downloads\\scan_images_registered_cropped_partial\\p0000071_1N_Hap_0144.tif")
+LATESTIMAGE=os.path.realpath("Data\\endpoints\\384\\J000244_033_030_2014-01-25_12-20-05.jpg")
 
 im,arr=openImage(LATESTIMAGE)
 
-#nx,ny=12,4
+#nx,ny=12,8
 nx,ny=24,16
 windowFrac=0.25
 smoothWindow=0.13
@@ -17,7 +18,7 @@ pdf=None
 
 acmedian=True
 rattol=0.1
-nsol=144
+nsol=64
 verbose=True
 
 ### 1: Estimate height and width of spots by examining inter-peak distances in autocorrelation function
@@ -69,13 +70,14 @@ dx=xtest[xind]
 ybest=yvals[yind][0]
 dy=ytest[yind]
 
-grd=makeGrid((ybest,xbest),ny,nx,dy=dy,dx=dx,theta=0)
+grd,gp=makeGrid((ybest,xbest),ny,nx,dy=dy,dx=dx,theta=0,makeGaps=False)
 candy,candx=list(zip(*grd))
 plotAC(sumy,sumx,candy,candx,maximay,maximax,pdf=pdf,main="Projection Estimate")
 
 ### 3: Optimise positions, first just optimise x0,y0 then update, optimising x0,y0,dx and theta
 
-smarr=nd.filters.gaussian_filter(arr,2*math.sqrt(dmin))
+smarr=ndimage.filters.gaussian_filter(arr,dmin/10.0)
+showIm(smarr)
 
 checkvecs=[range(ry),range(rx)]
 checkpos=list(itertools.product(*checkvecs))
@@ -89,8 +91,8 @@ com=ndimage.measurements.center_of_mass(arr)
 com=[int(round(x)) for x in com]
 
 #bounds=[(peaksy[0]+dy,ry),(peaksx[0]+dx,rx),(0.8*min(dy,dx),1.2*max(dy,dx)),(-5,5)]
-bounds=[(max(int(round(dy/2.0)),ybest-dy),min(int(round(arr.shape[0]-(ny-1)*dy)),ybest+dy)),
-         (max(int(round(dx/2.0)),xbest-dx),min(int(round(arr.shape[1]-(nx-1)*dx)),xbest+dx)),
+bounds=[(max(int(round(dy/2.0)),ybest-2.0*dy),min(int(round(arr.shape[0]-(ny-1)*dy)),ybest+2.0*dy)),
+         (max(int(round(dx/2.0)),xbest-2.0*dx),min(int(round(arr.shape[1]-(nx-1)*dx)),xbest+2.0*dx)),
          (0.8*min(dy,dx),1.2*max(dy,dx)),
          (-5,5)]
 
@@ -98,7 +100,7 @@ def makeOptAll(arr,ny,nx,bounds,sampfrac=0.35):
     def optfun(xvs):
         xrs=[b[0]+xv*(b[1]-b[0]) for b,xv in zip(bounds,xvs)]
         #res=-1*checkPos(arr,ny,nx,xrs[0:2],xrs[2],xrs[2],xrs[3],sampfrac=sampfrac)
-        res=-1*checkPoints(arr,ny,nx,xrs[0:2],xrs[2],xrs[2],xrs[3])
+        res=-1*checkPoints(arr,ny,nx,xrs[0:2],xrs[2],xrs[2],xrs[3],True)
         return (res)
     return optfun
 
@@ -108,7 +110,7 @@ def makeOptPos(arr,ny,nx,dx_norm,theta_norm,bounds,sampfrac=0.35):
     def optfun(xvs):
         xrs=[b[0]+xv*(b[1]-b[0]) for b,xv in zip(bounds[0:2],xvs)]
         #res=-1*checkPos(arr,ny,nx,xrs,dx,dx,theta,sampfrac=sampfrac)
-        res=-1*checkPoints(arr,ny,nx,xrs,dx,dx,theta)
+        res=-1*checkPoints(arr,ny,nx,xrs,dx,dx,theta,True)
         return (res)
     return optfun
 
@@ -120,7 +122,7 @@ optpos=makeOptPos(smarr,ny,nx,dx_norm,0.5,bounds)
 
 # For even sampling: nsol = Nsamps**Ndim   
 x0s=[sobol.i4_sobol(2,i)[0] for i in range(nsol)]
-firstsol=[op.minimize(optpos,x0=x,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds[0:2]],jac=False,options={'eps':0.005,'disp':optmess,'maxiter':3}) for x in x0s]
+firstsol=[op.minimize(optpos,x0=x,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds[0:2]],jac=False,options={'eps':0.005,'disp':optmess,'maxiter':5}) for x in x0s]
 solpos=firstsol[numpy.argmin([sol.fun for sol in firstsol])]
 
 solnpos=solpos.x

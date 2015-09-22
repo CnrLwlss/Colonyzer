@@ -42,7 +42,7 @@ def parseArgs(inp=''):
     parser.add_argument("-f","--fixthresh", type=float, help="Image segmentation threshold value (default is automatic thresholding).")
     parser.add_argument("-u","--usedict", type=str, help="Load .json file specifying images to analyse.  If argument has a .json extension, treat as filename.  Otherwise assume argument is a HTS-style screen ID and return path to appropriate .json file from directory structure.  See C2Find.py in HTSauto package.")
     parser.add_argument("-o","--fmt", type=str, nargs='+', help="Specify rectangular grid format, either using integer shorthand (e.g. -o 96, -o 384, -o 768 -o 1536) or explicitly specify number of rows followed by number of columns (e.g.: -o 24 16 or -o 24x16).", default=['384'])
-    parser.add_argument("-t","--updates", type=int, help="Number of (quasi-)randomly distributed grid positions to assess in first phase of grid location.  Ignored when -initpos specified.", default=36)
+    parser.add_argument("-t","--updates", type=int, help="Number of (quasi-)randomly distributed grid positions to assess in first phase of grid location.  Ignored when -initpos specified.", default=64)
     
     if inp=="":
         args = parser.parse_args()

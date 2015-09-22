@@ -267,38 +267,54 @@ def sampleArr(arr,pos,svals):
         val=0
     return(val)
 
-def makeGrid(pos0,ny,nx,dy,dx,theta=0):
+def rotateGrid(cor,pos,theta):
+    '''Rotate points in pos about centre of rotation cor by angle theta (degrees)'''
+    rads=2*math.pi*theta/360.0
+    s=math.sin(-rads)
+    c=math.cos(-rads)
+    post=[(p[0]-cor[0],p[1]-cor[1]) for p in pos]
+    posr=[(p[1]*s+p[0]*c,p[1]*c-p[0]*s) for p in post]
+    posf=[(int(round(p[0]+cor[0])),int(round(p[1]+cor[1]))) for p in posr]
+    return(posf)
+
+def makeGrid(pos0,ny,nx,dy,dx,theta=0,makeGaps=False,gapsOutside=True):
     '''Generate grid coordinates from top left position, grid dimension gap sizes and angle (rotation about top left).'''
     y0,x0=pos0
     rads=2*math.pi*theta/360.0
     s=math.sin(-rads)
     c=math.cos(-rads)
-    vecs=[range(ny),range(nx)]
-    gpos=list(itertools.product(*vecs))
+    vpos=[range(ny),range(nx)]
+    gpos=list(itertools.product(*vpos))
     pos=[(y0+gp[0]*dy,x0+gp[1]*dx) for gp in gpos]
-    post=[(p[0]-pos[0][0],p[1]-pos[0][1]) for p in pos]
-    posr=[(p[1]*s+p[0]*c,p[1]*c-p[0]*s) for p in post]
-    posf=[(int(round(p[0]+pos[0][0])),int(round(p[1]+pos[0][1]))) for p in posr]
-    return(posf)
-    
-def checkPos(arr,ny,nx,pos0,dy,dx,theta=0,sampfrac=0.1):
-    '''Return sum of pixel intensities in arr around grid points'''
-    sx=int(round(dx*sampfrac))
-    sy=int(round(dy*sampfrac))
-    pos=makeGrid(pos0,ny,nx,dy,dx,theta)
-    gap=makeGrid((int(round(pos0[0]+dy/2.0)),int(round(pos0[1]+dx/2.0))),ny-1,nx-1,dy,dx,theta)
-    posvals=[sampleArr(arr,p,(sx,sy)) for p in pos]
-    gapvals=[sampleArr(arr,p,(sx,sy)) for g in gap]
-    return(float(sum(posvals))/len(posvals)-float(sum(gapvals))/len(gapvals))
+    pos=rotateGrid(pos0,pos,theta)
+    if makeGaps:
+        if gapsOutside: # gaps include outside of grid
+            gd=1
+        else: # gaps only inside grid
+            gd=-1
+        vgap=[range(ny+gd),range(nx+gd)]
+        ggap=list(itertools.product(*vgap))
+        gap=[(int(round(y0-gd*dy/2.0+gp[0]*dy)),int(round(x0-gd*dx/2.0+gp[1]*dx))) for gp in gpos]
+        gap=rotateGrid(pos0,gap,theta)
+    else:
+        gap=()
+    return((pos,gap))
 
-def checkPoints(arr,ny,nx,pos0,dy,dx,theta=0):
+def checkPoints(arr,ny,nx,pos0,dy,dx,theta=0,gapsOutside=True):
     '''Return pixel intensities at grid points in (typically smoothed) 2D array'''
-    pos=list(zip(*makeGrid(pos0,ny,nx,dy,dx,theta)))
-    g0=makeGrid(pos0,2,2,dy/2.0,dx/2.0,theta)[3] # Calculate position of top-left gap
-    gap=list(zip(*makeGrid(g0,ny-1,nx-1,dy,dx,theta)))
+    pos,gap=makeGrid(pos0,ny,nx,dy,dx,theta,True,gapsOutside)
+    pos=list(zip(*pos))
+    gap=list(zip(*gap))
+    # Check all points on grid lie within image
+    #if any(p>=arr.shape[0] or p<0 for p in pos[0]) or any(p>=arr.shape[1] or p>0 for p in pos[1]):
+    pos[0]=[max(0,min(arr.shape[0]-1,p)) for p in pos[0]]
+    pos[1]=[max(0,min(arr.shape[1]-1,p)) for p in pos[1]]
+    gap[0]=[max(0,min(arr.shape[0]-1,p)) for p in gap[0]]
+    gap[1]=[max(0,min(arr.shape[1]-1,p)) for p in gap[1]]
     posvals=arr[pos[0],pos[1]]
     gapvals=arr[gap[0],gap[1]]
-    return(numpy.mean(posvals)-numpy.mean(gapvals))
+    res=numpy.mean(posvals)-numpy.mean(gapvals)
+    return(res)
 
 def fitProjection(proj,delt,n,sp=0.0,st=0.0):
     '''Find grid position that best fits a 1D projection of intensity by brute force'''
@@ -313,6 +329,8 @@ def fitProjection(proj,delt,n,sp=0.0,st=0.0):
 
 def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,pdf=None,acmedian=True,rattol=0.1,glob=False,verbose=False,nsol=36):
     '''Automatically search for best estimate for location of culture array (based on culture centres, not top-left corner).'''
+    ### 1: Estimate height and width of spots by examining inter-peak distances in autocorrelation function
+
     # Generate windowed mean intensities, scanning along x and y axes
     # Estimate spot diameter, assuming grid takes up most of the plate
     diam=min(float(arr.shape[0])/ny,float(arr.shape[1])/nx)
@@ -336,23 +354,20 @@ def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,p
         dx=int(round(maximax[0]))
 
     # Some plate inoculation patterns (e.g. alternate columns of fit and sick strains in miniQFA) break this ACF procedure (skip every second column)
-    # However, the row ACF estimate is still robust.  In the case of disagreement, choose the smallest value
-    rat=float(dy)/float(dx)
-    #if rat > (rattol+1.0) or rat < 1.0/(rattol+1.0):
+    # However, the row ACF estimate is still robust.  First estimate: choose the smallest value
     dmin=min(dy,dx)
     dy,dx=dmin,dmin
-        
+
+    # Given shape of grid and size of tiles, search range for x0 and y0, assuming grid parallel to plate edges
     ry=arr.shape[0]-ny*dy
     rx=arr.shape[1]-nx*dx
 
-    #xvals=[fitProjection(sumx,int(round(dxval)),nx) for dxval in numpy.linspace(0.95*dx,min(int(round(arr.shape[1]/nx))-1,1.05*dx),100)]
-    #yvals=[fitProjection(sumy,int(round(dyval)),ny) for dyval in numpy.linspace(0.95*dy,min(int(round(arr.shape[0]/ny))-1,1.05*dy),100)]
+    ### 2: Find x0,y0 that maximises contrast between grid points and intermediate points (e.g. aligns grid with peaks and troughs),
+    ### in horizontal and vertical ACF.  Optimise with fixed dx, for a range of dx.
+
     dd=int(round(0.01*dx))
-    dd=1
     xtest=range(dx-dd,min(int(round(arr.shape[1]/nx))-1,dx+dd))
     ytest=range(dy-dd,min(int(round(arr.shape[0]/ny))-1,dy+dd))
-    #xtest=numpy.linspace(dx-dd,min(int(round(arr.shape[1]/nx))-1,dx+dd),20)
-    #ytest=numpy.linspace(dy-dd,min(int(round(arr.shape[0]/ny))-1,dy+dd),20)
     xvals=[fitProjection(sumx,int(round(dxval)),nx,1,1) for dxval in xtest]
     yvals=[fitProjection(sumy,int(round(dyval)),ny,1,1) for dyval in ytest]
     xind=numpy.argmin([x[1] for x in xvals])
@@ -363,14 +378,15 @@ def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,p
     ybest=yvals[yind][0]
     dy=ytest[yind]
 
-    #xbest=fitProjection(sumx,dx,nx,1,1)[0]
-    #ybest=fitProjection(sumy,dy,ny,1,1)[0]
-
-    grd=makeGrid((ybest,xbest),ny,nx,dy=dy,dx=dx,theta=0)
+    grd,gp=makeGrid((ybest,xbest),ny,nx,dy=dy,dx=dx,theta=0,makeGaps=False)
     candy,candx=list(zip(*grd))
     plotAC(sumy,sumx,candy,candx,maximay,maximax,pdf=pdf,main="Projection Estimate")
 
-    
+    ### 3: Optimise positions, first just optimise x0,y0 then update, optimising x0,y0,dx and theta
+
+    smarr=ndimage.filters.gaussian_filter(arr,dmin/10.0)
+    #showIm(smarr)
+
     checkvecs=[range(ry),range(rx)]
     checkpos=list(itertools.product(*checkvecs))
 
@@ -383,12 +399,16 @@ def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,p
     com=[int(round(x)) for x in com]
 
     #bounds=[(peaksy[0]+dy,ry),(peaksx[0]+dx,rx),(0.8*min(dy,dx),1.2*max(dy,dx)),(-5,5)]
-    bounds=[(ybest-dy,ybest+dy),(xbest-dx,xbest+dx),(0.8*min(dy,dx),1.2*max(dy,dx)),(-5,5)]
+    bounds=[(max(int(round(dy/2.0)),ybest-2.0*dy),min(int(round(arr.shape[0]-(ny-1)*dy)),ybest+2.0*dy)),
+         (max(int(round(dx/2.0)),xbest-2.0*dx),min(int(round(arr.shape[1]-(nx-1)*dx)),xbest+2.0*dx)),
+         (0.8*min(dy,dx),1.2*max(dy,dx)),
+         (-5,5)]
 
     def makeOptAll(arr,ny,nx,bounds,sampfrac=0.35):
         def optfun(xvs):
             xrs=[b[0]+xv*(b[1]-b[0]) for b,xv in zip(bounds,xvs)]
-            res=-1*checkPos(arr,ny,nx,xrs[0:2],xrs[2],xrs[2],xrs[3],sampfrac=sampfrac)
+            #res=-1*checkPos(arr,ny,nx,xrs[0:2],xrs[2],xrs[2],xrs[3],sampfrac=sampfrac)
+            res=-1*checkPoints(arr,ny,nx,xrs[0:2],xrs[2],xrs[2],xrs[3])
             return (res)
         return optfun
 
@@ -397,34 +417,34 @@ def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,p
         theta=bounds[3][0]+theta_norm*(bounds[3][1]-bounds[3][0])
         def optfun(xvs):
             xrs=[b[0]+xv*(b[1]-b[0]) for b,xv in zip(bounds[0:2],xvs)]
-            res=-1*checkPos(arr,ny,nx,xrs,dx,dx,theta,sampfrac=sampfrac)
+            #res=-1*checkPos(arr,ny,nx,xrs,dx,dx,theta,sampfrac=sampfrac)
+            res=-1*checkPoints(arr,ny,nx,xrs,dx,dx,theta)
             return (res)
         return optfun
 
+    ### 3a: Optimise x0,y0 assuming grid parallel to edges of image and tile dimensions known (ignore theta, dx and dy)
     optmess=False
 
     dx_norm=(min(dx,dy)-bounds[2][0])/(bounds[2][1]-bounds[2][0])
-    optpos=makeOptPos(arr,ny,nx,dx_norm,0.5,bounds)
+    optpos=makeOptPos(smarr,ny,nx,dx_norm,0.5,bounds)
 
     # For even sampling: nsol = Nsamps**Ndim   
     x0s=[sobol.i4_sobol(2,i)[0] for i in range(nsol)]
-    firstpass=[optpos(x) for x in x0s]
-    #firstguess=x0s[numpy.argmin(firstpass)]
-    firstsol=[op.minimize(optpos,x0=x,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds[0:2]],jac=False,options={'eps':0.01,'disp':optmess,'gtol':0.1,'maxiter':3}) for x in x0s]
+    firstsol=[op.minimize(optpos,x0=x,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds[0:2]],jac=False,options={'eps':0.005,'disp':optmess,'maxiter':5}) for x in x0s]
     solpos=firstsol[numpy.argmin([sol.fun for sol in firstsol])]
 
-    #solpos=op.minimize(optpos,x0=firstguess,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds[0:2]],jac=False,options={'eps':0.005,'disp':optmess,'gtol':0.1})
     solnpos=solpos.x
     solnpos=numpy.append(solnpos,[dx_norm,0.5])
 
     soln=[b[0]+xv*(b[1]-b[0]) for b,xv in zip(bounds,solnpos)]
     candy,candx=grid(soln,ny,nx)
     plotAC(sumy,sumx,candy,candx,maximay,maximax,pdf=pdf,main="First pass")
+    ybest,xbest,dx,theta=soln
 
-    optall=makeOptAll(arr,ny,nx,bounds)
-    xguess=list([0.5 for b in bounds])
+    ### 3b: Optimise all parameters, using above as initial guess
+    optall=makeOptAll(smarr,ny,nx,bounds)
 
-    sol=op.minimize(optall,x0=solnpos,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds],jac=False,options={'eps':0.001,'disp':optmess,'gtol':0.1})
+    sol=op.minimize(optall,x0=solnpos,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds],jac=False,options={'eps':0.005,'disp':optmess})
     soln=[b[0]+xv*(b[1]-b[0]) for b,xv in zip(bounds,sol.x)]
 
     ##    x0s.append(xguess[0:2])
@@ -445,6 +465,7 @@ def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,p
     if showPlt:
         plotAC(sumy,sumx,candy,candx,maximay,maximax,pdf=pdf,main="Solution")
 
+    xguess=list([0.5 for b in bounds])
     init=[b[0]+xv*(b[1]-b[0]) for b,xv in zip(bounds,xguess)]
     return((candx,candy,dx,dy,corner,com,init[0:2]))
 
@@ -452,7 +473,7 @@ def grid(soln,ny,nx):
     pos0=soln[0:2]
     dy,dx=soln[2],soln[2]    
     theta=soln[3]
-    grid=makeGrid(pos0,ny,nx,dy=dy,dx=dx,theta=theta)
+    grid,gap=makeGrid(pos0,ny,nx,dy=dy,dx=dx,theta=theta,makeGaps=False)
     candy,candx=list(zip(*grid))
     return((candy,candx))
 
