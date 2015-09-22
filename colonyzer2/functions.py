@@ -294,7 +294,8 @@ def checkPos(arr,ny,nx,pos0,dy,dx,theta=0,sampfrac=0.1):
 def checkPoints(arr,ny,nx,pos0,dy,dx,theta=0):
     '''Return pixel intensities at grid points in (typically smoothed) 2D array'''
     pos=list(zip(*makeGrid(pos0,ny,nx,dy,dx,theta)))
-    gap=list(zip(*makeGrid((int(round(pos0[0]+dy/2.0)),int(round(pos0[1]+dx/2.0))),ny-1,nx-1,dy,dx,theta)))
+    g0=makeGrid(pos0,2,2,dy/2.0,dx/2.0,theta)[3] # Calculate position of top-left gap
+    gap=list(zip(*makeGrid(g0,ny-1,nx-1,dy,dx,theta)))
     posvals=arr[pos[0],pos[1]]
     gapvals=arr[gap[0],gap[1]]
     return(numpy.mean(posvals)-numpy.mean(gapvals))
