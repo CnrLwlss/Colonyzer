@@ -264,6 +264,9 @@ def main(inp=""):
             startim=time.time()
             
             im,arr=c2.openImage(FILENAME)
+            # Local updates on individual images to allow for slight movement of plate
+            locationsN=c2.locateCultures([int(round(cx-dx/2.0)) for cx in candx],[int(round(cy-dy/2.0)) for cy in candy],dx,dy,arr,ncol,nrow,update=True)
+            
             if correction:
                 arr=arr*correction_map
 
