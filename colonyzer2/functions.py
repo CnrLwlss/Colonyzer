@@ -38,6 +38,8 @@ def readInstructions(fullpath,fname='Colonyzer.txt'):
                 else:
                     InsData[tlist[0]]=[tlist[1]]+[int(t.rstrip()) for t in tlist[2:]]
         InsData['default']=defaultArr
+    else:
+        raise ValueError(fname+" not found in directory")
     return(InsData)
 
 def parsePlateFormat(fmt):
@@ -251,22 +253,6 @@ def showIm(arr,returnIm=False):
     else:
         imnew.show()
 
-def sampleArr(arr,pos,svals):
-    '''Sum pixel intensities from arr in a rectangle centred on y,x'''
-    y,x=pos
-    sx,sy=svals
-    minx,miny=max(0,x-sx),max(0,y-sy)
-    maxx,maxy=min(arr.shape[1]-1,x+sx), min(arr.shape[0]-1,y+sy)
-    #val=numpy.nansum(arr[miny:maxy,minx:maxx])
-    samp=arr[miny:maxy,minx:maxx].flatten()
-##    lsamp=len(samp)
-##    if lsamp<sx*sy:
-##        samp=numpy.append(samp,numpy.zeros(sx*sy-lsamp))
-    val=numpy.nanmedian(samp)
-    if numpy.isnan(val):
-        val=0
-    return(val)
-
 def rotateGrid(cor,pos,theta):
     '''Rotate points in pos about centre of rotation cor by angle theta (degrees)'''
     rads=2*math.pi*theta/360.0
@@ -276,6 +262,21 @@ def rotateGrid(cor,pos,theta):
     posr=[(p[1]*s+p[0]*c,p[1]*c-p[0]*s) for p in post]
     posf=[(int(round(p[0]+cor[0])),int(round(p[1]+cor[1]))) for p in posr]
     return(posf)
+
+def convertij(pos, NCol,oneIndexGrid=False,oneIndexVector=False):
+    '''Converts row i, col j into row-major vector index'''
+    ## Think about this instead: [i for i,g in enumerate(gpos) if g==(14,2)]
+    i = pos[0]-oneIndexGrid
+    j = pos[1]-oneIndexGrid
+    if(j>=NCol):
+        raise ValueError("Column index greater than number of columns")
+    return(i*NCol+j+oneIndexVector)
+
+def convertind(ind, NCol,oneIndexGrid=False,oneIndexVector=False):
+    '''Converts row-major vector index into row i and col j'''
+    row = (ind-oneIndexVector)//NCol
+    col = (ind-oneIndexVector)-row*NCol
+    return((row+oneIndexGrid, col+oneIndexGrid))
 
 def makeGrid(pos0,ny,nx,dy,dx,theta=0,makeGaps=False,gapsOutside=True):
     '''Generate grid coordinates from top left position, grid dimension gap sizes and angle (rotation about top left).'''
@@ -316,13 +317,19 @@ def checkPoints(arr,ny,nx,pos0,dy,dx,theta=0,gapsOutside=True):
     res=numpy.mean(posvals)-numpy.mean(gapvals)
     return(res)
 
-def fitProjection(proj,delt,n,sp=0.0,st=0.0):
+def fitProjection(proj,delt,n,sp=0.0,st=0.0,gapsOutside=True):
     '''Find grid position that best fits a 1D projection of intensity by brute force'''
     checkinds=range(int(round(delt/2.0)),int(round(len(proj)-delt*n)))
+    if gapsOutside:
+        gd=1
+    else:
+        gd=-1
     def getObj(i,proj,sp,st):
         peaks=proj[i:int(round((i+delt*n))):int(round(delt))]
-        troughs=proj[int(round((i-delt/2.0))):int(round((i+delt*(n+0.5)))):int(round(delt))]
-        return(numpy.median(peaks)-numpy.median(troughs)-sp*numpy.std(peaks)-st*numpy.std(troughs))
+        troughs=proj[int(round((i-gd*delt/2.0))):int(round((i+delt*(n+gd*0.5)))):int(round(delt))]
+        diffs=[p-t for p,t in zip(peaks,troughs)+zip(reversed(peaks),reversed(troughs))]
+        return(numpy.mean(diffs)-sp*numpy.std(peaks)-st*numpy.std(troughs))
+        #return(numpy.median(peaks)-numpy.median(troughs)-sp*numpy.std(peaks)-st*numpy.std(troughs))
     grds=[getObj(i,proj,sp,st) for i in checkinds]
     maxind=numpy.argmax(grds)
     return((checkinds[maxind],grds[maxind]))
@@ -368,8 +375,8 @@ def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,p
     dd=int(round(0.01*dx))
     xtest=range(dx-dd,min(int(round(arr.shape[1]/nx))-1,dx+dd))
     ytest=range(dy-dd,min(int(round(arr.shape[0]/ny))-1,dy+dd))
-    xvals=[fitProjection(sumx,int(round(dxval)),nx,1,1) for dxval in xtest]
-    yvals=[fitProjection(sumy,int(round(dyval)),ny,1,1) for dyval in ytest]
+    xvals=[fitProjection(sumx,int(round(dxval)),nx,1.0,1.0,True) for dxval in xtest]
+    yvals=[fitProjection(sumy,int(round(dyval)),ny,1.0,1.0,True) for dyval in ytest]
     xind=numpy.argmin([x[1] for x in xvals])
     yind=numpy.argmin([y[1] for y in yvals])
 
@@ -620,8 +627,11 @@ def getRoot(p,ints):
 
 def thresholdArr(arrim,thresh):
     '''Thresholding array representation of an image'''
-    arrim[arrim<thresh]=0
-    arrim[arrim>=thresh]=255
+    if thresh>0:
+        arrim[arrim<thresh]=0
+        arrim[arrim>=thresh]=255
+    else:
+        arrim=numpy.round(arrim)
     arrim=numpy.array(arrim,dtype=numpy.uint8)
     imnew=Image.fromarray(arrim, "L")
     return(imnew)
@@ -898,14 +908,10 @@ def locateCulturesScan(candx,candy,dx,dy,arrN,nx,ny,search=0.4,radFrac=1.0,mkPlo
         locations.y=locations.y+dy/2.0
     return(locations)
 
-def edgeBrightness(arr,pos,dy,dx):
-    try:
-        res=sum(arr[pos[0]:(pos[0]+dy),pos[1]])+sum(arr[pos[0]:(pos[0]+dy),pos[1]+dx])+sum(arr[pos[0],(pos[1]+1):(pos[1]+dx-1)])+sum(arr[pos[0]+dy,(pos[1]+1):(pos[1]+dx-1)])
-    except:
-        res=99999999999999999
-    return(res)
+def edgeBrightness(tile):
+    return(numpy.mean(numpy.concatenate((tile[0,:],tile[-1,:],tile[1:-1,0],tile[1:-1,-1]))))
 
-def locateCultures(candx,candy,dx,dy,arr,nx,ny,update=True,maxupdates=10,fuzzy=0.01):
+def locateCultures(candx,candy,dx,dy,arr,nx,ny,update=True,maxupdates=100,fuzzy=0.01,samp=1.0):
     '''Recursively calculate centre of mass for each tile until it converges (or updates maxupdates times).'''
     cols,rows=numpy.meshgrid(numpy.arange(1,nx+1),numpy.arange(1,ny+1))
     cx=list(candx)
@@ -913,22 +919,35 @@ def locateCultures(candx,candy,dx,dy,arr,nx,ny,update=True,maxupdates=10,fuzzy=0
     dx=int(round(dx))
     dy=int(round(dy))
 
+    def measure(pos):
+        cy0,cx0=max(0,pos[0]),max(0,pos[1])
+        yA,yB=cy0,min((cy0+dy),arr.shape[0]-1)
+        xA,xB=cx0,min((cx0+dx),arr.shape[1]-1)
+        tile=arr[yA:yB,xA:xB]
+        COM=ndimage.measurements.center_of_mass(tile)
+        if sum(numpy.isnan(COM))>0:
+            COM=(dy/2.0,dx/2.0)
+        cy=min(max(0,int(round(cy0+COM[0]-dy/2.0))),arr.shape[0]-1)
+        cx=min(max(0,int(round(cx0+COM[1]-dx/2.0))),arr.shape[1]-1)
+        return((pos,(cy,cx),edgeBrightness(tile),tile.sum()))
+    
+    def updateLocation(pos):
+        # Recursive iteration looking for centre of mass, recording brightness and edge length
+        res=[measure(pos)]
+        new=measure(res[-1][1])
+        while new!=res[-1] and len(res)<=maxupdates:
+            res.append(new)
+            new=measure(res[-1][1])
+        # Accept latest solution in series that gives edge length within a factor of (1+fuzzy) of the minimum observed
+        edges=[r[2] for r in res]
+        edgeMin=min(edges)
+        res=[r for r in res if r[2]<=(1+fuzzy)*edgeMin]
+        sol=res[-1]
+        return(sol[0])
+
     if update:
-        for i in range(0,len(cx)):
-            cy0,cx0=cy[i],cx[i]
-            # Get centre of mass
-            counter=0
-            COM0=(int(round(cy0+dy/2.0)),int(round(cx0+dx/2.0)))
-            edgesum0=edgeBrightness(arr,(cy0,cx0),dy,dx)
-            COM=ndimage.measurements.center_of_mass(arr[cy0:(cy0+dy),cx0:(cx0+dx)])
-            edgesum=edgeBrightness(arr,(int(round(cy0+COM[0]-dy/2.0)),int(round(cx0+COM[1]-dx/2.0))),dy,dx)
-            while COM != COM0 and edgesum <= (1.0+fuzzy) * edgesum0 and counter < maxupdates:
-                cy[i]=int(round(cy[i]+COM[0]-dy/2.0))
-                cx[i]=int(round(cx[i]+COM[1]-dx/2.0))
-                COM0=COM
-                COM=ndimage.measurements.center_of_mass(arr[cy[i]:(cy[i]+dy),cx[i]:(cx[i]+dx)])
-                edgesum=edgeBrightness(arr,(cy[i],cx[i]),dy,dx)
-                counter+=1
+        posnew=[updateLocation(p) for p in zip(cy,cx)]
+    cy,cx=zip(*posnew)
                 
     d={"Row":rows.flatten(),"Column":cols.flatten(),"y":[cyv+dy/2.0 for cyv in cy],"x":[cxv+dx/2.0 for cxv in cx]}
     locations=pandas.DataFrame(d)

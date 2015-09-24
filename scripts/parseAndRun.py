@@ -36,13 +36,14 @@ def parseArgs(inp=''):
     parser.add_argument("-i","--initpos", help="Use intial guess for culture positions from Colonyzer.txt file?", action="store_true")
     parser.add_argument("-x","--cut", help="Cut culture signal from first image to make pseudo-empty plate?", action="store_true")
     parser.add_argument("-q","--quiet", help="Suppress messages printed to screen during analysis?", action="store_true")
+    parser.add_argument("-e","--endpoint", help="Only analyse final image in series.  Mostly for testing single image analysis.",action="store_true")
     
     parser.add_argument("-d","--dir", type=str, help="Directory in which to search for image files that have not been analysed (current directory by default).",default=".")
     parser.add_argument("-l","--logsdir", type=str, help="Directory in which to search for JSON files listing images for analyis (e.g. LOGS3, root of HTS filestore).  Only used when intending to specify images for analysis in .json file (see -u).",default=".")
     parser.add_argument("-f","--fixthresh", type=float, help="Image segmentation threshold value (default is automatic thresholding).")
     parser.add_argument("-u","--usedict", type=str, help="Load .json file specifying images to analyse.  If argument has a .json extension, treat as filename.  Otherwise assume argument is a HTS-style screen ID and return path to appropriate .json file from directory structure.  See C2Find.py in HTSauto package.")
     parser.add_argument("-o","--fmt", type=str, nargs='+', help="Specify rectangular grid format, either using integer shorthand (e.g. -o 96, -o 384, -o 768 -o 1536) or explicitly specify number of rows followed by number of columns (e.g.: -o 24 16 or -o 24x16).", default=['384'])
-    parser.add_argument("-t","--updates", type=int, help="Number of (quasi-)randomly distributed grid positions to assess in first phase of grid location.  Ignored when -initpos specified.", default=64)
+    parser.add_argument("-t","--updates", type=int, help="Number of (quasi-)randomly distributed grid positions to assess in first phase of grid location.  Ignored when -initpos specified.", default=144)
     
     if inp=="":
         args = parser.parse_args()
@@ -120,7 +121,7 @@ def buildVars(inp=''):
             print("Images will be segmented using fixed threshold: "+str(fixedThresh)+".")
         if fdict is not None and os.path.exists(fdict):
             print("Preparing to load barcodes from "+fdict+".")
-    res={'lc':inp.lc,'fixedThresh':fixedThresh,'plots':inp.plots,'initpos':inp.initpos,'fdict':fdict,'fdir':fdir,'nrow':nrow,'ncol':ncol,'cut':cut,'verbose':verbose,'diffims':diffIms,'updates':inp.updates}
+    res={'lc':inp.lc,'fixedThresh':fixedThresh,'plots':inp.plots,'initpos':inp.initpos,'fdict':fdict,'fdir':fdir,'nrow':nrow,'ncol':ncol,'cut':cut,'verbose':verbose,'diffims':diffIms,'updates':inp.updates,'endpoint':inp.endpoint}
     return(res)
 
 def locateJSON(scrID,dirHTS='.',verbose=False):
@@ -181,7 +182,7 @@ def main(inp=""):
     cythonFill=False
 
     var=buildVars(inp=inp)
-    correction,fixedThresh,plots,initpos,fdict,fdir,nrow,ncol,cut,verbose,diffIms,updates=(var["lc"],var["fixedThresh"],var["plots"],var["initpos"],var["fdict"],var["fdir"],var["nrow"],var["ncol"],var["cut"],var["verbose"],var["diffims"],var["updates"])
+    correction,fixedThresh,plots,initpos,fdict,fdir,nrow,ncol,cut,verbose,diffIms,updates,endpoint=(var["lc"],var["fixedThresh"],var["plots"],var["initpos"],var["fdict"],var["fdir"],var["nrow"],var["ncol"],var["cut"],var["verbose"],var["diffims"],var["updates"],var["endpoint"])
     barcdict=checkImages(fdir,fdict,verbose=verbose)
     rept=c2.setupDirectories(barcdict,verbose=verbose)
 
@@ -202,11 +203,12 @@ def main(inp=""):
         # Get latest image for thresholding and detecting culture locations
         imN,arrN=c2.openImage(LATESTIMAGE)
         # Get earliest image for lighting gradient correction
-        if(LATESTIMAGE==EARLIESTIMAGE):
+        if (LATESTIMAGE==EARLIESTIMAGE) or endpoint:
             im0,arr0=imN,arrN
+            arrloc=arrN
         else:
             im0,arr0=c2.openImage(EARLIESTIMAGE)
-
+            arrloc=numpy.maximum(0,arrN-arr0)
         if initpos:
             InsData=c2.readInstructions(os.path.dirname(LATESTIMAGE))
             # Load initial guesses from Colonyzer.txt file
@@ -217,10 +219,10 @@ def main(inp=""):
             nx=ncol=len(numpy.unique(candx))
         else:
             # Automatically generate guesses for gridded array locations
-            (candx,candy,dx,dy,corner,com,guess)=c2.estimateLocations(arrN,ncol,nrow,showPlt=plots,pdf=pdf,glob=False,verbose=verbose,nsol=updates)
+            (candx,candy,dx,dy,corner,com,guess)=c2.estimateLocations(arrloc,ncol,nrow,showPlt=plots,pdf=pdf,glob=False,verbose=verbose,nsol=updates)
 
         # Update guesses and initialise locations data frame
-        locationsN=c2.locateCultures([int(round(cx-dx/2.0)) for cx in candx],[int(round(cy-dy/2.0)) for cy in candy],dx,dy,arrN,ncol,nrow,update=True)
+        locationsN=c2.locateCultures([int(round(cx-dx/2.0)) for cx in candx],[int(round(cy-dy/2.0)) for cy in candy],dx,dy,arrloc,ncol,nrow,update=True)
 
         if correction:
             if cut:

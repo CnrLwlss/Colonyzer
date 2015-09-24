@@ -3,11 +3,21 @@ from colonyzer2 import *
 from scipy import optimize as op
 from scipy import ndimage
 
-#LATESTIMAGE=os.path.realpath("Data\\endpoints\\384\\DLR00012647-2009-07-04_09-35-20.jpg")
+#LATESTIMAGE=os.path.realpath("Data\\384\\DLR00012647-2009-07-04_09-35-20.jpg")
 #LATESTIMAGE=os.path.realpath("F:\\Downloads\\scan_images_registered_cropped_partial\\p0000071_1N_Hap_0144.tif")
-LATESTIMAGE=os.path.realpath("Data\\endpoints\\384\\J000244_033_030_2014-01-25_12-20-05.jpg")
+#LATESTIMAGE=os.path.realpath("F:\\PLOSGeneticsImages\\pdump_cdc13\\DLR00012257-2009-11-27_17-22-47.JPG")
+#EARLIESTIMAGE=os.path.realpath("F:\\PLOSGeneticsImages\\pdump_cdc13\\DLR00012257-2009-11-23_18-33-06.JPG")
+EARLIESTIMAGE=os.path.realpath("Data\\384\\DLR00012255-2009-11-23_18-42-06.JPG")
+LATESTIMAGE=os.path.realpath("Data\\384\\DLR00012255-2009-11-27_17-26-18.JPG")
 
-im,arr=openImage(LATESTIMAGE)
+imN,arrN=openImage(LATESTIMAGE)
+
+if "EARLIESTIMAGE" not in locals():
+    im0,arr0=imN,arrN
+    arr=arrN
+else:
+    im0,arr0=openImage(EARLIESTIMAGE)
+    arr=numpy.maximum(0,arrN-arr0)
 
 #nx,ny=12,8
 nx,ny=24,16
@@ -18,7 +28,7 @@ pdf=None
 
 acmedian=True
 rattol=0.1
-nsol=64
+nsol=144
 verbose=True
 
 ### 1: Estimate height and width of spots by examining inter-peak distances in autocorrelation function
@@ -60,8 +70,8 @@ rx=arr.shape[1]-nx*dx
 dd=int(round(0.01*dx))
 xtest=range(dx-dd,min(int(round(arr.shape[1]/nx))-1,dx+dd))
 ytest=range(dy-dd,min(int(round(arr.shape[0]/ny))-1,dy+dd))
-xvals=[fitProjection(sumx,int(round(dxval)),nx,1,1) for dxval in xtest]
-yvals=[fitProjection(sumy,int(round(dyval)),ny,1,1) for dyval in ytest]
+xvals=[fitProjection(sumx,int(round(dxval)),nx,1.0,1.0,True) for dxval in xtest]
+yvals=[fitProjection(sumy,int(round(dyval)),ny,1.0,1.0,True) for dyval in ytest]
 xind=numpy.argmin([x[1] for x in xvals])
 yind=numpy.argmin([y[1] for y in yvals])
 
@@ -159,3 +169,7 @@ if showPlt:
 
 xguess=list([0.5 for b in bounds])
 init=[b[0]+xv*(b[1]-b[0]) for b,xv in zip(bounds,xguess)]
+
+locationsN=locateCultures([int(round(cx-dx/2.0)) for cx in candx],[int(round(cy-dy/2.0)) for cy in candy],dx,dy,arr,nx,ny,update=True)
+imloc=threshPreview(arr,-99,locationsN)
+imloc.show()
