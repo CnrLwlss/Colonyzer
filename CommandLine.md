@@ -1,9 +1,9 @@
 ```
 >colonyzer -h
-Colonyzer 1.0.93.Unknown
-usage: colonyzer-script.py [-h] [-c] [-m] [-p] [-i] [-x] [-q] [-d DIR]
+Colonyzer 1.0.93.4f756d5b5b72d7fa6f81b585229406751363d9cb
+usage: colonyzer-script.py [-h] [-c] [-m] [-p] [-i] [-x] [-q] [-e] [-d DIR]
                            [-l LOGSDIR] [-f FIXTHRESH] [-u USEDICT]
-                           [-o FMT [FMT ...]]
+                           [-o FMT [FMT ...]] [-t UPDATES]
 
 Analyse timeseries of QFA images: locate cultures on plate, segment image into
 agar and cells, apply lighting correction, write report including cell density
@@ -25,6 +25,8 @@ optional arguments:
   -x, --cut             Cut culture signal from first image to make pseudo-
                         empty plate?
   -q, --quiet           Suppress messages printed to screen during analysis?
+  -e, --endpoint        Only analyse final image in series. Mostly for testing
+                        single image analysis.
   -d DIR, --dir DIR     Directory in which to search for image files that have
                         not been analysed (current directory by default).
   -l LOGSDIR, --logsdir LOGSDIR
@@ -45,5 +47,9 @@ optional arguments:
                         Specify rectangular grid format, either using integer
                         shorthand (e.g. -o 96, -o 384, -o 768 -o 1536) or
                         explicitly specify number of rows followed by number
-                        of columns (e.g.: -o 24 16 or -o 24x16)
+                        of columns (e.g.: -o 24 16 or -o 24x16).
+  -t UPDATES, --updates UPDATES
+                        Number of (quasi-)randomly distributed grid positions
+                        to assess in first phase of grid location. Ignored
+                        when -initpos specified.
 ```
