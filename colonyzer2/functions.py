@@ -334,7 +334,7 @@ def fitProjection(proj,delt,n,sp=0.0,st=0.0,gapsOutside=True):
     maxind=numpy.argmax(grds)
     return((checkinds[maxind],grds[maxind]))
 
-def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,pdf=None,acmedian=True,rattol=0.1,glob=False,verbose=False,nsol=36):
+def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=False,pdf=None,acmedian=True,rattol=0.1,glob=False,verbose=False,nsol=36):
     '''Automatically search for best estimate for location of culture array (based on culture centres, not top-left corner).'''
     ### 1: Estimate height and width of spots by examining inter-peak distances in autocorrelation function
 
@@ -387,7 +387,8 @@ def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,p
 
     grd,gp=makeGrid((ybest,xbest),ny,nx,dy=dy,dx=dx,theta=0,makeGaps=False)
     candy,candx=list(zip(*grd))
-    plotAC(sumy,sumx,candy,candx,maximay,maximax,pdf=pdf,main="Projection Estimate")
+    if showPlt:
+        plotAC(sumy,sumx,candy,candx,maximay,maximax,pdf=pdf,main="Projection Estimate")
 
     ### 3: Optimise positions, first just optimise x0,y0 then update, optimising x0,y0,dx and theta
 
@@ -445,7 +446,8 @@ def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=True,p
 
     soln=[b[0]+xv*(b[1]-b[0]) for b,xv in zip(bounds,solnpos)]
     candy,candx=grid(soln,ny,nx)
-    plotAC(sumy,sumx,candy,candx,maximay,maximax,pdf=pdf,main="First pass")
+    if showPlt:
+        plotAC(sumy,sumx,candy,candx,maximay,maximax,pdf=pdf,main="First pass")
     ybest,xbest,dx,theta=soln
 
     ### 3b: Optimise all parameters, using above as initial guess
