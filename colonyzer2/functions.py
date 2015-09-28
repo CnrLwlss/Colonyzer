@@ -913,7 +913,7 @@ def locateCulturesScan(candx,candy,dx,dy,arrN,nx,ny,search=0.4,radFrac=1.0,mkPlo
 def edgeBrightness(tile):
     return(numpy.mean(numpy.concatenate((tile[0,:],tile[-1,:],tile[1:-1,0],tile[1:-1,-1]))))
 
-def locateCultures(candx,candy,dx,dy,arr,nx,ny,update=True,maxupdates=100,fuzzy=0.01,samp=1.0):
+def locateCultures(candx,candy,dx,dy,arr,nx,ny,update=True,maxupdates=5,fuzzy=0.01,samp=1.0):
     '''Recursively calculate centre of mass for each tile until it converges (or updates maxupdates times).'''
     cols,rows=numpy.meshgrid(numpy.arange(1,nx+1),numpy.arange(1,ny+1))
     cx=list(candx)
@@ -943,7 +943,7 @@ def locateCultures(candx,candy,dx,dy,arr,nx,ny,update=True,maxupdates=100,fuzzy=
         # Accept latest solution in series that gives edge length within a factor of (1+fuzzy) of the minimum observed
         edges=[r[2] for r in res]
         edgeMin=min(edges)
-        res=[r for r in res if r[2]<=(1+fuzzy)*edgeMin]
+        res=[r for r in res if (r[2]<=(1+fuzzy)*edgeMin and numpy.linalg.norm(numpy.array(r[0])-numpy.array(r[1]))<=max(dx,dy)/2.0)]
         sol=res[-1]
         return(sol[0])
 
