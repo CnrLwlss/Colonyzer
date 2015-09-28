@@ -277,6 +277,7 @@ def main(inp=""):
                 meanPx=numpy.mean(arrsm[numpy.logical_not(masksm)])
 
                 arr=arr+(average_back-meanPx)
+                arr=numpy.maximum(0,arr)
                 threshadj=thresh+(average_back-meanPx)
             else:
                 threshadj=thresh
