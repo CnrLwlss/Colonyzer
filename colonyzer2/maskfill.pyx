@@ -10,7 +10,7 @@ ctypedef np.float_t DTYPEf_t
 DTYPEb = np.uint8
 ctypedef np.uint8_t DTYPEb_t
 
-def maskAndFill(arrNArg,finalMaskArg,np.float_t tol=5.0):
+def maskAndFillCython(arrNArg,finalMaskArg,np.float_t tol=5.0):
 	'''Cut out masked pixels from image and re-fill using a Markov field update.'''
 	cdef int h = arrNArg.shape[0]
 	cdef int w = arrNArg.shape[1]

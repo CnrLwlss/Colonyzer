@@ -10,6 +10,7 @@ import itertools
 from matplotlib.backends.backend_pdf import PdfPages, FigureCanvasPdf
 from matplotlib import figure
 from PIL import Image,ImageDraw
+from scipy import ndimage
 
 def checkImages(fdir,fdict=None,barcRange=(0,-24),verbose=False):
     '''Discover barcodes in current working directory (or in fdir or in those specified in fdict) for which analysis has not started.'''
@@ -158,7 +159,7 @@ def loadLocationGuesses(IMAGE,InsData):
         (candx,candy,dx,dy)=c2.SetUp(InsData['default'])
     return((candx,candy,dx,dy))
 
-def cutEdgesFromMask(mask,locations):
+def cutEdgesFromMask(mask,locations,dx,dy):
     '''Mask for identifying culture areas (edge detection). Set all pixels outside culture grid to background, to aid binary filling later.'''
     mask[0:min(locations.y-dy/2),:]=False
     mask[max(locations.y+dy/2):mask.shape[0],:]=False
@@ -166,13 +167,13 @@ def cutEdgesFromMask(mask,locations):
     mask[:,max(locations.x+dx/2):mask.shape[1]]=False
     return(mask)
 
-def edgeFill(arr,locations,cutoff=0.8):
-    edgeN=getEdges(arr,cutoff=0.8)
+def edgeFill(arr,locations,dx,dy,cutoff=0.8):
+    edgeN=c2.getEdges(arr,cutoff=0.8)
     dilN=ndimage.morphology.binary_dilation(edgeN,iterations=2)
     erodeN=ndimage.morphology.binary_erosion(dilN,iterations=1)
     dil2N=ndimage.morphology.binary_dilation(dilN,iterations=3)
     
-    fillN=ndimage.morphology.binary_fill_holes(cutEdgesFromMask(dil2N,locations))
+    fillN=ndimage.morphology.binary_fill_holes(cutEdgesFromMask(dil2N,locations,dx,dy))
     maskN=ndimage.morphology.binary_erosion(fillN,iterations=7)
     return(maskN)
 
@@ -226,13 +227,13 @@ def main(inp=""):
 
         if correction:
             if cut:
-                mask=edgeFill(arr0,locationsN,0.8)
+                mask=edgeFill(arr0,locationsN,dx,dy,0.8)
                 startFill=time.time()
                 if cythonFill:
-                    pseudoempty=maskAndFillCython(arr0,maskN,0.005)
+                    pseudoempty=c2.maskAndFillCython(arr0,maskN,0.005)
                     print("Inpainting using Cython & NumPy: "+str(time.time()-startFill)+" s")
                 else:
-                    pseudoempty=maskAndFill(arr0,mask,0.005)
+                    pseudoempty=c2.maskAndFill(arr0,mask,0.005)
                     print("Inpainting using NumPy: "+str(time.time()-start)+" s")
             else:
                 pseudoempty=arr0
