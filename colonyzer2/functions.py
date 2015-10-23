@@ -1350,7 +1350,7 @@ def getORF(libs,Library,Plate,Row,Column):
     filt=libs.ORF[(libs.Library==Library)&(libs.Plate==Plate)&(libs.Row==Row)&(libs.Column==Column)]
     return(filt.get_values()[0])
 
-def parseAndCombine(imOutDir=".",exptDesc="ExptDescription.txt",libDesc="LibraryDescription.txt",geneToORF="ORF2GENE.txt",fout="ColonyzerOutput.txt",fmt="%Y-%m-%d_%H-%M-%S"):
+def parseAndCombine(imOutDir=".",metaDir=".",exptDesc="ExptDescription.txt",libDesc="LibraryDescription.txt",geneToORF="ORF2GENE.txt",fout="ColonyzerOutput.txt",fmt="%Y-%m-%d_%H-%M-%S"):
     '''Read in a list of colonyzer output files, together with optional metadata files describing inoculation times, strains, treatments applied etc. to produce one summary output file.'''
     # Read in and combine all .out files
     imListROOT=os.listdir(imOutDir)
@@ -1362,14 +1362,14 @@ def parseAndCombine(imOutDir=".",exptDesc="ExptDescription.txt",libDesc="Library
     
     try:
         # Read in experimental metadata
-        expt=pd.read_csv(exptDesc,sep="\t",header=0)
+        expt=pd.read_csv(os.path.join(metaDir,exptDesc),sep="\t",header=0)
     except:
         print(exptDesc+" not found, carrying on...")
         expt=None
         
     try:
         # Read in library description file
-        libs=pd.read_csv(libDesc,sep="\t",header=0)
+        libs=pd.read_csv(os.path.join(metaDir,libDesc),sep="\t",header=0)
         libs.columns=[x.rstrip() for x in libs.columns]
     except:
         print(libDesc+" not found, carrying on...")
@@ -1377,7 +1377,7 @@ def parseAndCombine(imOutDir=".",exptDesc="ExptDescription.txt",libDesc="Library
 
     try:
         # Read in file describing link between standard gene name and systematic gene name (ORF) as python dictionary orf2g
-        g2orf_df=pd.read_csv(geneToORF,sep="\t",header=None)
+        g2orf_df=pd.read_csv(os.path.join(metaDir,geneToORF),sep="\t",header=None)
         orf2g=dict(zip(g2orf_df[0],g2orf_df[1]))
     except:
         print(geneToORF+" not found, carrying on...")
@@ -1405,5 +1405,5 @@ def parseAndCombine(imOutDir=".",exptDesc="ExptDescription.txt",libDesc="Library
             ims["Gene"]=[orf2g[orf] for orf in ims.ORF]
 
     # Write data, metadata and newly calulated times to file
-    ims.to_csv(fout,sep="\t")
+    ims.to_csv(fout,sep="\t",index=False)
     return(ims)
