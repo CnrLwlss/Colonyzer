@@ -1,4 +1,6 @@
-import numpy,pandas,PIL,math,os,sys,time,platform
+import PIL,math,os,sys,time,platform
+import numpy as np
+import pandas as pd
 from datetime import datetime
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages

@@ -5,7 +5,7 @@ import shutil
 import string
 import os
 import time
-import numpy
+import numpy as np
 import itertools
 from matplotlib.backends.backend_pdf import PdfPages, FigureCanvasPdf
 from matplotlib import figure
@@ -209,15 +209,15 @@ def main(inp=""):
             arrloc=arrN
         else:
             im0,arr0=c2.openImage(EARLIESTIMAGE)
-            arrloc=numpy.maximum(0,arrN-arr0)
+            arrloc=np.maximum(0,arrN-arr0)
         if initpos:
             InsData=c2.readInstructions(os.path.dirname(LATESTIMAGE))
             # Load initial guesses from Colonyzer.txt file
             (candx,candy,dx,dy)=loadLocationGuesses(LATESTIMAGE,InsData)
             corner=[0,0]; com=[0,0]; guess=[0,0]
             # NOTE: assumes that grid returned by loadLocationGuesses is parallel to image edges
-            ny=nrow=len(numpy.unique(candy)) 
-            nx=ncol=len(numpy.unique(candx))
+            ny=nrow=len(np.unique(candy)) 
+            nx=ncol=len(np.unique(candx))
         else:
             # Automatically generate guesses for gridded array locations
             (candx,candy,dx,dy,corner,com,guess)=c2.estimateLocations(arrloc,ncol,nrow,showPlt=plots,pdf=pdf,glob=False,verbose=verbose,nsol=updates)
@@ -231,19 +231,20 @@ def main(inp=""):
                 startFill=time.time()
                 if cythonFill:
                     pseudoempty=c2.maskAndFillCython(arr0,maskN,0.005)
-                    print("Inpainting using Cython & NumPy: "+str(time.time()-startFill)+" s")
+                    print("Inpainting using Cython & np: "+str(time.time()-startFill)+" s")
                 else:
                     pseudoempty=c2.maskAndFill(arr0,mask,0.005)
-                    print("Inpainting using NumPy: "+str(time.time()-start)+" s")
+                    print("Inpainting using np: "+str(time.time()-start)+" s")
             else:
                 pseudoempty=arr0
-                # Smooth (pseudo-)empty image 
-                (correction_map,average_back)=c2.makeCorrectionMap(pseudoempty,locationsN,verbose=verbose)
                 
-                # Correct spatial gradient in final image
-                corrected_arrN=arrN*correction_map
+            # Smooth (pseudo-)empty image 
+            (correction_map,average_back)=c2.makeCorrectionMap(pseudoempty,locationsN,verbose=verbose)
+                
+            # Correct spatial gradient in final image
+            corrected_arrN=arrN*correction_map
         else:
-            average_back=numpy.mean(arr0[numpy.min(locationsN.y):numpy.max(locationsN.y),numpy.min(locationsN.x):numpy.max(locationsN.x)])
+            average_back=np.mean(arr0[np.min(locationsN.y):np.max(locationsN.y),np.min(locationsN.x):np.max(locationsN.x)])
             corrected_arrN=arrN
 
         # Trim outer part of image to remove plate walls
@@ -257,7 +258,7 @@ def main(inp=""):
                 c2.plotModel(bindat,label=BARCODE,pdf=pdf)
 
         # Mask for identifying culture areas
-        maskN=numpy.ones(arrN.shape,dtype=numpy.bool)
+        maskN=np.ones(arrN.shape,dtype=np.bool)
         maskN[corrected_arrN<thresh]=False
 
         for FILENAME in barcdict[BARCODE]:
@@ -275,15 +276,15 @@ def main(inp=""):
                 # Correct for lighting differences between plates
                 arrsm=arr[max(0,int(round(min(locationsN.y)-dy/2.0))):min(arrN.shape[0],int(round((max(locationsN.y)+dy/2.0)))),max(0,int(round(min(locationsN.x)-dx/2.0))):min(arrN.shape[1],int(round((max(locationsN.x)+dx/2.0))))]
                 masksm=maskN[max(0,int(round(min(locationsN.y)-dy/2.0))):min(arrN.shape[0],int(round((max(locationsN.y)+dy/2.0)))),max(0,int(round(min(locationsN.x)-dx/2.0))):min(arrN.shape[1],int(round((max(locationsN.x)+dx/2.0))))]
-                meanPx=numpy.mean(arrsm[numpy.logical_not(masksm)])
+                meanPx=np.mean(arrsm[np.logical_not(masksm)])
 
                 arr=arr+(average_back-meanPx)
-                arr=numpy.maximum(0,arr)
+                arr=np.maximum(0,arr)
                 threshadj=thresh+(average_back-meanPx)
             else:
                 threshadj=thresh
 
-            mask=numpy.ones(arr.shape,dtype=numpy.bool)
+            mask=np.ones(arr.shape,dtype=np.bool)
             mask[corrected_arrN<threshadj]=False
 
             # Measure culture phenotypes
