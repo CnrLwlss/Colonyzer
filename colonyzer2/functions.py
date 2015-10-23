@@ -126,19 +126,19 @@ def contiguous_regions(condition):
     '''Finds contiguous True regions of the boolean array "condition". Returns
     a 2D array where the first column is the start index of the region and the
     second column is the end index.
-    http://stackoverflow.com/questions/4494404/find-large-number-of-consecutive-values-fulfilling-condition-in-a-numpy-array'''
+    http://stackoverflow.com/questions/4494404/find-large-number-of-consecutive-values-fulfilling-condition-in-a-np-array'''
     # Find the indicies of changes in "condition"
-    d = numpy.diff(condition)
+    d = np.diff(condition)
     idx, = d.nonzero() 
     # We need to start things after the change in "condition". Therefore, 
     # we'll shift the index by 1 to the right.
     idx += 1
     if condition[0]:
         # If the start of condition is True prepend a 0
-        idx = numpy.r_[0, idx]
+        idx = np.r_[0, idx]
     if condition[-1]:
         # If the end of condition is True, append the length of the array
-        idx = numpy.r_[idx, condition.size] # Edit
+        idx = np.r_[idx, condition.size] # Edit
     # Reshape the result into two columns
     idx.shape = (-1,2)
     return idx
@@ -146,12 +146,12 @@ def contiguous_regions(condition):
 def getMaxima(intensity):
     '''Numerical method to find local maxima in a 1D list with plateaus'''
     npoints=len(intensity)
-    diffs=numpy.diff(intensity)
+    diffs=np.diff(intensity)
     zeroregions=contiguous_regions(diffs==0)
     maxima=[]
     for z in zeroregions:
         if z[0]>0 and z[1]<npoints-2 and diffs[z[0]-1]>0 and diffs[z[1]]<0:
-            maxima.append(numpy.mean(z)+1)
+            maxima.append(np.mean(z)+1)
     return(maxima)
 
 def optimiseSpot(arr,x,y,rad,RAD,mkPlots=False):
@@ -159,11 +159,11 @@ def optimiseSpot(arr,x,y,rad,RAD,mkPlots=False):
     xmin,xmax=max(0,x-RAD),min(arr.shape[1],x+RAD)
     ymin,ymax=max(0,y-RAD),min(arr.shape[0],y+RAD)
     # Generate windowed mean intensities, scanning along x and y axes
-    sumx=numpy.array([numpy.mean(arr[ymin:ymax,numpy.max([0,dx-rad]):numpy.min([arr.shape[1],dx+rad])]) for dx in range(xmin,xmax)],dtype=numpy.float)
-    sumy=numpy.array([numpy.mean(arr[numpy.max([0,dy-rad]):numpy.min([arr.shape[0],dy+rad]),xmin:xmax]) for dy in range(ymin,ymax)],dtype=numpy.float)
+    sumx=np.array([np.mean(arr[ymin:ymax,np.max([0,dx-rad]):np.min([arr.shape[1],dx+rad])]) for dx in range(xmin,xmax)],dtype=np.float)
+    sumy=np.array([np.mean(arr[np.max([0,dy-rad]):np.min([arr.shape[0],dy+rad]),xmin:xmax]) for dy in range(ymin,ymax)],dtype=np.float)
     # Find all maxima
-    maxx=1+numpy.where(numpy.diff(numpy.sign(numpy.diff(sumx)))==-2)[0]
-    maxy=1+numpy.where(numpy.diff(numpy.sign(numpy.diff(sumy)))==-2)[0]
+    maxx=1+np.where(np.diff(np.sign(np.diff(sumx)))==-2)[0]
+    maxy=1+np.where(np.diff(np.sign(np.diff(sumy)))==-2)[0]
     # Get maxima with highest peak
     if len(maxx)>0:
         bestx=maxx[0]
@@ -207,14 +207,14 @@ def optimiseSpotCANDIDATE(arr,x,y,rad,RAD,mkPlots=False):
         xmin,xmax=max(0,x-RAD),min(arr.shape[1],x+RAD)
         ymin,ymax=max(0,y-RAD),min(arr.shape[0],y+RAD)
         # Generate windowed mean intensities, scanning along x and y axes
-        #sumx=numpy.array([numpy.mean(arr[ymin:ymax,numpy.max([0,dx-rad]):numpy.min([arr.shape[1],dx+rad])]) for dx in range(xmin,xmax)],dtype=numpy.float)
-        #sumy=numpy.array([numpy.mean(arr[numpy.max([0,dy-rad]):numpy.min([arr.shape[0],dy+rad]),xmin:xmax]) for dy in range(ymin,ymax)],dtype=numpy.float)
+        #sumx=np.array([np.mean(arr[ymin:ymax,np.max([0,dx-rad]):np.min([arr.shape[1],dx+rad])]) for dx in range(xmin,xmax)],dtype=np.float)
+        #sumy=np.array([np.mean(arr[np.max([0,dy-rad]):np.min([arr.shape[0],dy+rad]),xmin:xmax]) for dy in range(ymin,ymax)],dtype=np.float)
 
-        sumx=numpy.array([numpy.mean(arr[y:max(arr.shape[0],y+2*rad),xtarg:max(arr.shape[1],xtarg+2*rad)]) for xtarg in range(xmin,xmax)],dtype=numpy.float)
-        sumy=numpy.array([numpy.mean(arr[ytarg:max(arr.shape[0],ytarg+2*rad),x:max(arr.shape[1],x+2*rad)]) for ytarg in range(ymin,ymax)],dtype=numpy.float)
+        sumx=np.array([np.mean(arr[y:max(arr.shape[0],y+2*rad),xtarg:max(arr.shape[1],xtarg+2*rad)]) for xtarg in range(xmin,xmax)],dtype=np.float)
+        sumy=np.array([np.mean(arr[ytarg:max(arr.shape[0],ytarg+2*rad),x:max(arr.shape[1],x+2*rad)]) for ytarg in range(ymin,ymax)],dtype=np.float)
 
-        bestx=xmin+numpy.argmax(sumx)
-        besty=ymin+numpy.argmax(sumy)
+        bestx=xmin+np.argmax(sumx)
+        besty=ymin+np.argmax(sumy)
 
         if mkPlots:
             fig,ax=plt.subplots(2,2)
@@ -239,14 +239,14 @@ def optimiseSpotCANDIDATE(arr,x,y,rad,RAD,mkPlots=False):
 
 def autocor(x):
     '''R-like autocorrelation function'''
-    s = numpy.fft.fft(x)
-    res=numpy.real(numpy.fft.ifft(s*numpy.conjugate(s)))/numpy.var(x)
+    s = np.fft.fft(x)
+    res=np.real(np.fft.ifft(s*np.conjugate(s)))/np.var(x)
     res=res[0:len(res)/2]
     return(res)
 
 def showIm(arr,returnIm=False):
     '''Quick 8-bit preview images from float arrays, useful for debugging'''
-    imarr=numpy.array(arr,dtype=numpy.uint8)
+    imarr=np.array(arr,dtype=np.uint8)
     if(arr.dtype=="bool"):
         imarr=imarr*255
     imnew=Image.fromarray(imarr,"L")
@@ -316,7 +316,7 @@ def checkPoints(arr,ny,nx,pos0,dy,dx,theta=0,gapsOutside=True):
     gap[1]=[max(0,min(arr.shape[1]-1,p)) for p in gap[1]]
     posvals=arr[pos[0],pos[1]]
     gapvals=arr[gap[0],gap[1]]
-    res=numpy.mean(posvals)-numpy.mean(gapvals)
+    res=np.mean(posvals)-np.mean(gapvals)
     return(res)
 
 def fitProjection(proj,delt,n,sp=0.0,st=0.0,gapsOutside=True):
@@ -330,10 +330,10 @@ def fitProjection(proj,delt,n,sp=0.0,st=0.0,gapsOutside=True):
         peaks=proj[i:int(round((i+delt*n))):int(round(delt))]
         troughs=proj[int(round((i-gd*delt/2.0))):int(round((i+delt*(n+gd*0.5)))):int(round(delt))]
         diffs=[p-t for p,t in zip(peaks,troughs)+zip(reversed(peaks),reversed(troughs))]
-        return(numpy.mean(diffs)-sp*numpy.std(peaks)-st*numpy.std(troughs))
-        #return(numpy.median(peaks)-numpy.median(troughs)-sp*numpy.std(peaks)-st*numpy.std(troughs))
+        return(np.mean(diffs)-sp*np.std(peaks)-st*np.std(troughs))
+        #return(np.median(peaks)-np.median(troughs)-sp*np.std(peaks)-st*np.std(troughs))
     grds=[getObj(i,proj,sp,st) for i in checkinds]
-    maxind=numpy.argmax(grds)
+    maxind=np.argmax(grds)
     return((checkinds[maxind],grds[maxind]))
 
 def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=False,pdf=None,acmedian=True,rattol=0.1,glob=False,verbose=False,nsol=36):
@@ -344,20 +344,20 @@ def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=False,
     # Estimate spot diameter, assuming grid takes up most of the plate
     diam=min(float(arr.shape[0])/ny,float(arr.shape[1])/nx)
     window=int(round(diam*windowFrac))
-    sumx=numpy.array([numpy.mean(arr[0:arr.shape[0],numpy.max([0,dx-window]):numpy.min([arr.shape[1],dx+window])]) for dx in range(0,arr.shape[1])],dtype=numpy.float)
-    sumy=numpy.array([numpy.mean(arr[numpy.max([0,dy-window]):numpy.min([arr.shape[0],dy+window]),0:arr.shape[1]]) for dy in range(0,arr.shape[0])],dtype=numpy.float)
+    sumx=np.array([np.mean(arr[0:arr.shape[0],np.max([0,dx-window]):np.min([arr.shape[1],dx+window])]) for dx in range(0,arr.shape[1])],dtype=np.float)
+    sumy=np.array([np.mean(arr[np.max([0,dy-window]):np.min([arr.shape[0],dy+window]),0:arr.shape[1]]) for dy in range(0,arr.shape[0])],dtype=np.float)
     # Smooth intensities to help eliminate small local maxima
     #sumx=ndimage.gaussian_filter1d(sumx,2.5)
     #sumy=ndimage.gaussian_filter1d(sumy,2.5)
 
     # Look at autocorrelation for first estimate of distance between spots
-    maximay=numpy.where(numpy.diff(numpy.sign(numpy.diff(autocor(sumy))))==-2)[0]
-    maximax=numpy.where(numpy.diff(numpy.sign(numpy.diff(autocor(sumx))))==-2)[0]
+    maximay=np.where(np.diff(np.sign(np.diff(autocor(sumy))))==-2)[0]
+    maximax=np.where(np.diff(np.sign(np.diff(autocor(sumx))))==-2)[0]
     if acmedian:
         # Note that median inter-peak distance is more robust here
         # Mean is thrown by outliers: gives poor initial guess for optimisation routine
-        dy=int(round(numpy.median(numpy.diff(maximay))))
-        dx=int(round(numpy.median(numpy.diff(maximax))))
+        dy=int(round(np.median(np.diff(maximay))))
+        dx=int(round(np.median(np.diff(maximax))))
     else:
         dy=int(round(maximay[0]))
         dx=int(round(maximax[0]))
@@ -379,8 +379,8 @@ def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=False,
     ytest=range(dy-dd,min(int(round(arr.shape[0]/ny))-1,dy+dd))
     xvals=[fitProjection(sumx,int(round(dxval)),nx,1.0,1.0,True) for dxval in xtest]
     yvals=[fitProjection(sumy,int(round(dyval)),ny,1.0,1.0,True) for dyval in ytest]
-    xind=numpy.argmin([x[1] for x in xvals])
-    yind=numpy.argmin([y[1] for y in yvals])
+    xind=np.argmin([x[1] for x in xvals])
+    yind=np.argmin([y[1] for y in yvals])
 
     xbest=xvals[xind][0]
     dx=xtest[xind]
@@ -401,8 +401,8 @@ def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=False,
     checkpos=list(itertools.product(*checkvecs))
 
     # Assume we can see the edges of the plate in the image (bright enough to make a peak in the smoothed intensities
-    peaksy=numpy.where(numpy.diff(numpy.sign(numpy.diff(sumy)))==-2)[0]
-    peaksx=numpy.where(numpy.diff(numpy.sign(numpy.diff(sumx)))==-2)[0]
+    peaksy=np.where(np.diff(np.sign(np.diff(sumy)))==-2)[0]
+    peaksx=np.where(np.diff(np.sign(np.diff(sumx)))==-2)[0]
     corner=[peaksy[0],peaksx[0]]
 
     com=ndimage.measurements.center_of_mass(arr)
@@ -441,10 +441,10 @@ def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=False,
     # For even sampling: nsol = Nsamps**Ndim   
     x0s=[sobol.i4_sobol(2,i)[0] for i in range(nsol)]
     firstsol=[op.minimize(optpos,x0=x,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds[0:2]],jac=False,options={'eps':0.005,'disp':optmess,'maxiter':5}) for x in x0s]
-    solpos=firstsol[numpy.argmin([sol.fun for sol in firstsol])]
+    solpos=firstsol[np.argmin([sol.fun for sol in firstsol])]
 
     solnpos=solpos.x
-    solnpos=numpy.append(solnpos,[dx_norm,0.5])
+    solnpos=np.append(solnpos,[dx_norm,0.5])
 
     soln=[b[0]+xv*(b[1]-b[0]) for b,xv in zip(bounds,solnpos)]
     candy,candx=grid(soln,ny,nx)
@@ -461,10 +461,10 @@ def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=False,
     ##    x0s.append(xguess[0:2])
     ##    x0s.append(sol1.x[0:2])
     ##    firstpass=[optpos(x) for x in x0s]
-    ##    firstguess=x0s[numpy.argmin(firstpass)]
+    ##    firstguess=x0s[np.argmin(firstpass)]
     ##    sol2=op.minimize(optpos,x0=firstguess,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds[0:2]],jac=False,options={'eps':0.005,'disp':optmess,'gtol':0.1})
     ##    soln2=sol2.x
-    ##    soln2=numpy.append(soln2,sol1.x[2:])
+    ##    soln2=np.append(soln2,sol1.x[2:])
     ##    sol=op.minimize(optall,x0=soln2,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds],jac=False,options={'eps':0.005,'disp':optmess,'gtol':0.1})
 
     if verbose:
@@ -537,15 +537,15 @@ def plotAC(sumy,sumx,candy,candx,maximay,maximax,pdf=None,main=""):
 def initialGuess(intensities,counts):
     '''Construct non-parametric guesses for distributions of two components and use these to estimate Gaussian parameters'''
     # Get all maxima
-    maxima=1+numpy.where(numpy.diff(numpy.sign(numpy.diff(counts)))==-2)[0]
-    maxima=maxima[counts[maxima]>0.01*numpy.max(counts)]
+    maxima=1+np.where(np.diff(np.sign(np.diff(counts)))==-2)[0]
+    maxima=maxima[counts[maxima]>0.01*np.max(counts)]
     # Get peak heights
     heights=counts[maxima]
     # Order maxima by peak heights
     maxima=maxima[heights.argsort()]
     # Take two biggest peaks as means of two components
     biggest=maxima[-1]
-    dists=numpy.abs(biggest-maxima)
+    dists=np.abs(biggest-maxima)
     nextbig_candidates=maxima[dists>len(intensities)/10.0]
     #nextbig_candidates=maxima[maxima>1.1*mu1]
     if(len(nextbig_candidates)>0):
@@ -557,7 +557,7 @@ def initialGuess(intensities,counts):
     mu2=max(biggest,nextbig)
     
     # Mirror curve from 0...mu1 to estimate distribution of first component
-    P1=numpy.zeros(len(intensities),dtype=numpy.int)
+    P1=np.zeros(len(intensities),dtype=np.int)
     halfpeak=counts[0:mu1]
     for i in range(0,mu1):
         P1[i]=halfpeak[i]
@@ -565,26 +565,26 @@ def initialGuess(intensities,counts):
         P1[i]=halfpeak[min(len(halfpeak)-1,max(0,2*len(halfpeak)-i))]
 
     # Mirror curve for second peak also
-    P2=numpy.zeros(len(intensities),dtype=numpy.int)
+    P2=np.zeros(len(intensities),dtype=np.int)
     halfpeak=counts[mu2:]
     for i in range(0,mu2):
         P2[i]=halfpeak[min(len(halfpeak)-1,mu2-i)]
     for i in range(mu2,len(intensities)):
         P2[i]=halfpeak[i-mu2]
     
-    bindat=pandas.DataFrame(intensities,columns=["intensities"])
+    bindat=pd.DataFrame(intensities,columns=["intensities"])
     bindat["counts"]=counts
     bindat["P1"]=P1
     bindat["P2"]=P2
     # Calculate standard deviation of (binned) observations from first and second components
-    sigma1=numpy.sqrt(numpy.sum(P1*(numpy.array(intensities-mu1,dtype=numpy.float)**2)/numpy.sum(P1)))
-    sigma2=numpy.sqrt(numpy.sum(P2*(numpy.array(intensities-mu2,dtype=numpy.float)**2)/numpy.sum(P2)))
+    sigma1=np.sqrt(np.sum(P1*(np.array(intensities-mu1,dtype=np.float)**2)/np.sum(P1)))
+    sigma2=np.sqrt(np.sum(P2*(np.array(intensities-mu2,dtype=np.float)**2)/np.sum(P2)))
     # Estimate component weighting
-    theta=float(numpy.sum(P1))/float(numpy.sum(P1)+numpy.sum(P2))
+    theta=float(np.sum(P1))/float(np.sum(P1)+np.sum(P2))
     # Discard empty bins
     bindat=bindat[bindat.counts>0]
-    bindat["frac"]=numpy.array(numpy.cumsum(bindat.counts),dtype=numpy.float)/numpy.sum(bindat.counts)
-    bindat["freq"]=numpy.array(bindat.counts,dtype=numpy.float)/numpy.sum(bindat.counts)
+    bindat["frac"]=np.array(np.cumsum(bindat.counts),dtype=np.float)/np.sum(bindat.counts)
+    bindat["freq"]=np.array(bindat.counts,dtype=np.float)/np.sum(bindat.counts)
     #plotGuess(bindat)
     return((bindat,[theta,mu1,mu2,sigma1,sigma2]))
 
@@ -599,22 +599,22 @@ def totFunc(x,p):
 
 def makeObjective(ints,cnts,PDF):
     '''Returns a function for (log likelihood)*-1 (suitable for minimisation), given a set of binned observations and a PDF'''
-    ints=numpy.array(ints,dtype=numpy.int)
-    cnts=numpy.array(cnts,dtype=numpy.int)
+    ints=np.array(ints,dtype=np.int)
+    cnts=np.array(cnts,dtype=np.int)
     def logL(p):
-        modeldens=numpy.array([PDF(x,p) for x in ints],dtype=numpy.float)
-        lik=numpy.sum(cnts*numpy.log(modeldens))
+        modeldens=np.array([PDF(x,p) for x in ints],dtype=np.float)
+        lik=np.sum(cnts*np.log(modeldens))
         return(-1*lik)
     return(logL)
 
 def getRoot(p,ints):
     '''Get the point at which two component Gaussians intersect.  Specifically looking for root with highest probability.'''
     [theta,mu1,mu2,sigma1,sigma2]=p
-    ints=numpy.array(ints,dtype=numpy.int)
+    ints=np.array(ints,dtype=np.int)
     def diffFunc(x):
         return(theta*stats.norm.pdf(x,mu1,sigma1)-(1.0-theta)*stats.norm.pdf(x,mu2,sigma2))
     # Find pairs of points in truncated, filtered intensity list which bracket any roots
-    diffs=[numpy.sign(diffFunc(x)) for x in ints]
+    diffs=[np.sign(diffFunc(x)) for x in ints]
     switches=[]
     for i in range(1,len(diffs)):
         if abs((diffs[i]-diffs[i-1]))==2:
@@ -626,7 +626,7 @@ def getRoot(p,ints):
         threshlist.append(thresh)
     # Get root which gives the highest probability for peak 1 (or peak 2, either is fine)
     p1=[stats.norm.pdf(thresh,mu1,sigma1) for thresh in threshlist]
-    thresh=threshlist[numpy.argmax(p1)]
+    thresh=threshlist[np.argmax(p1)]
     return(thresh)
 
 def thresholdArr(arrim,thresh):
@@ -635,8 +635,8 @@ def thresholdArr(arrim,thresh):
         arrim[arrim<thresh]=0
         arrim[arrim>=thresh]=255
     else:
-        arrim=numpy.round(arrim)
-    arrim=numpy.array(arrim,dtype=numpy.uint8)
+        arrim=np.round(arrim)
+    arrim=np.array(arrim,dtype=np.uint8)
     imnew=Image.fromarray(arrim, "L")
     return(imnew)
 
@@ -677,10 +677,10 @@ def getEdges(arr,cutoff=0.9975):
     '''Sobel edge detection for 2d array using scipy functions'''
     sx = ndimage.sobel(arr, axis=0)
     sy = ndimage.sobel(arr, axis=1)
-    sob = numpy.hypot(sx, sy)
+    sob = np.hypot(sx, sy)
     sob[sob<stats.mstats.mquantiles(sob,cutoff)[0]]=0
     sob[sob>0]=1
-    return(numpy.array(sob,dtype=numpy.bool))  
+    return(np.array(sob,dtype=np.bool))  
 
 def sizeSpots(locations,arr,thresharr,edge,background=0):
     '''Add intensity measures and other phenotypes to locations dataFrame'''
@@ -693,21 +693,21 @@ def sizeSpots(locations,arr,thresharr,edge,background=0):
         tile=arr[max(0,y-rad):min(arr.shape[0],(y+rad+1)),max(0,x-rad):min(arr.shape[1],(x+rad+1))]-background
         threshtile=thresharr[max(0,y-rad):min(arr.shape[0],(y+rad+1)),max(0,x-rad):min(arr.shape[1],(x+rad+1))]
         edgetile=edge[max(0,y-rad):min(arr.shape[0],(y+rad+1)),max(0,x-rad):min(arr.shape[1],(x+rad+1))]
-        perimeter=numpy.sum(edgetile)
-        area=numpy.sum(threshtile)
+        perimeter=np.sum(edgetile)
+        area=np.sum(threshtile)
         if perimeter>0:
             circularity=4*math.pi*area/(perimeter)**2
         else:
             circularity=0
-        featureMedian=numpy.median(tile[threshtile])/intMax
-        backgroundMedian=numpy.median(tile[numpy.logical_not(threshtile)])/intMax
-        sumInt.append(float(numpy.sum(tile))/(float(tile.size)*intMax))
+        featureMedian=np.median(tile[threshtile])/intMax
+        backgroundMedian=np.median(tile[np.logical_not(threshtile)])/intMax
+        sumInt.append(float(np.sum(tile))/(float(tile.size)*intMax))
         sumArea.append(float(area)/float(tile.size))
-        trim.append(float(numpy.sum(tile[threshtile]))/(float(tile.size)*intMax))
+        trim.append(float(np.sum(tile[threshtile]))/(float(tile.size)*intMax))
         fMed.append(featureMedian/intMax)
         bMed.append(backgroundMedian/intMax)
         circ.append(circularity)
-        fVar.append(numpy.var(tile[threshtile]/intMax))
+        fVar.append(np.var(tile[threshtile]/intMax))
         perim.append(float(perimeter)/float(tile.size))
     locations["Intensity"]=sumInt
     locations["Area"]=sumArea
@@ -722,19 +722,19 @@ def sizeSpots(locations,arr,thresharr,edge,background=0):
 def getColours(im,locations,thresharr):
     '''Extract feature and background mean and median Red Green and Blue channel values for a given 24 bit image'''
     (red,green,blue)=im.split()
-    redarr,greenarr,bluearr=numpy.array(red,dtype=numpy.uint8),numpy.array(green,dtype=numpy.uint8),numpy.array(blue,dtype=numpy.uint8)
+    redarr,greenarr,bluearr=np.array(red,dtype=np.uint8),np.array(green,dtype=np.uint8),np.array(blue,dtype=np.uint8)
     r,g,b,rB,gB,bB,rm,gm,bm,rmB,gmB,bmB=[],[],[],[],[],[],[],[],[],[],[],[]
-    store=numpy.zeros((len(locations.x.values),12),numpy.float)
+    store=np.zeros((len(locations.x.values),12),np.float)
     for i in range(0,len(locations.x.values)):
         x,y,rad=locations.x.values[i],locations.y.values[i],int(math.ceil(max(locations.Diameter.values)/2.0))
         redtile=redarr[y-rad:(y+rad+1),x-rad:(x+rad+1)]
         greentile=greenarr[y-rad:(y+rad+1),x-rad:(x+rad+1)]
         bluetile=bluearr[y-rad:(y+rad+1),x-rad:(x+rad+1)]
         threshtile=thresharr[y-rad:(y+rad+1),x-rad:(x+rad+1)]
-        rMean,gMean,bMean=numpy.mean(redtile[threshtile]),numpy.mean(greentile[threshtile]),numpy.mean(bluetile[threshtile])
-        rMed,gMed,bMed=numpy.median(redtile[threshtile]),numpy.median(greentile[threshtile]),numpy.median(bluetile[threshtile])
-        rMeanBk,gMeanBk,bMeanBk=numpy.mean(redtile[numpy.logical_not(threshtile)]),numpy.mean(greentile[numpy.logical_not(threshtile)]),numpy.mean(bluetile[numpy.logical_not(threshtile)])
-        rMedBk,gMedBk,bMedBk=numpy.median(redtile[numpy.logical_not(threshtile)]),numpy.median(greentile[numpy.logical_not(threshtile)]),numpy.median(bluetile[numpy.logical_not(threshtile)])
+        rMean,gMean,bMean=np.mean(redtile[threshtile]),np.mean(greentile[threshtile]),np.mean(bluetile[threshtile])
+        rMed,gMed,bMed=np.median(redtile[threshtile]),np.median(greentile[threshtile]),np.median(bluetile[threshtile])
+        rMeanBk,gMeanBk,bMeanBk=np.mean(redtile[np.logical_not(threshtile)]),np.mean(greentile[np.logical_not(threshtile)]),np.mean(bluetile[np.logical_not(threshtile)])
+        rMedBk,gMedBk,bMedBk=np.median(redtile[np.logical_not(threshtile)]),np.median(greentile[np.logical_not(threshtile)]),np.median(bluetile[np.logical_not(threshtile)])
         store[i]=[rMean,gMean,bMean,rMeanBk,gMeanBk,bMeanBk,rMed,gMed,bMed,rMedBk,gMedBk,bMedBk]
     locations["redMean"]=store[:,0]
     locations["greenMean"]=store[:,1]
@@ -774,7 +774,7 @@ def saveColonyzer(filename,locs,thresh,dx,dy):
     df["XDIM"]=dx
     df["YDIM"]=dy
     colorder=("FILENAME","ROW","COLUMN","TOPLEFTX","TOPLEFTY","WHITEAREA","TRIMMED","THRESHOLD","INTENSITY","EDGEPIXELS","COLR","COLG","COLB","BKR","BKG","BKB","EDGELEN","XDIM","YDIM")
-    dataf=pandas.DataFrame(df)
+    dataf=pd.DataFrame(df)
     dataf.reindex_axis(colorder, axis=1)
     dataf.to_csv(filename,"\t",index=False,header=False,cols=colorder,engine='python')
     return(dataf)
@@ -788,7 +788,7 @@ def setupDirectories(dictlist,verbose=True):
     # Else assume a list
 
     # Get unique set of directories in list:
-    dirs=numpy.unique([os.path.dirname(fname) for fname in dictlist])
+    dirs=np.unique([os.path.dirname(fname) for fname in dictlist])
     newdirs=[]
     # Create directories for storing output data and preview images
     for directory in dirs:
@@ -816,7 +816,7 @@ def getImageNames(fullpath):
                     allfiles.append(os.path.join(dirname, filename))
                 elif filename[-4:] == '.out':
                     alldats.append(os.path.join(dirname, filename))
-    imsDone=list(numpy.unique([os.path.basename(dat).split(".")[0] for dat in alldats]))
+    imsDone=list(np.unique([os.path.basename(dat).split(".")[0] for dat in alldats]))
     imList=[]
     for filename in allfiles:
         imname=os.path.basename(filename).split(".")[0]
@@ -844,9 +844,9 @@ Return a dictionary of filenames, listed by barcode (plate ID)'''
                     allfiles.append(os.path.join(dirname, filename))
                 elif filename[-4:] == '.out':
                     alldats.append(os.path.join(dirname, filename))
-    imsDone=list(numpy.unique([os.path.basename(dat).split(".")[0] for dat in alldats]))
+    imsDone=list(np.unique([os.path.basename(dat).split(".")[0] for dat in alldats]))
     if checkDone:
-        barcsDone=list(numpy.unique([os.path.basename(dat)[barcRange[0]:barcRange[1]] for dat in alldats]))
+        barcsDone=list(np.unique([os.path.basename(dat)[barcRange[0]:barcRange[1]] for dat in alldats]))
     else:
         barcsDone=[]
     barcdict={}
@@ -859,8 +859,8 @@ Return a dictionary of filenames, listed by barcode (plate ID)'''
             else:
                 barcdict[barc].append(filename)
     for b in barcdict:
-        fnames=numpy.array([os.path.basename(x) for x in barcdict[b]])
-        barcdict[b]=list(numpy.array(barcdict[b])[fnames.argsort()])[::-1]
+        fnames=np.array([os.path.basename(x) for x in barcdict[b]])
+        barcdict[b]=list(np.array(barcdict[b])[fnames.argsort()])[::-1]
         #barcdict[b].sort(reverse=True)
     if verbose and not barcdict: print("No new images to analyse found in "+fullpath+".")
     return(barcdict)
@@ -885,15 +885,15 @@ def openImage(imName):
     # Strip alpha channel if present
     im = im.convert("RGB")
     img=im.convert("F")
-    arrN=numpy.array(img,dtype=numpy.float)
+    arrN=np.array(img,dtype=np.float)
     return(im,arrN)
 
 def locateCulturesScan(candx,candy,dx,dy,arrN,nx,ny,search=0.4,radFrac=1.0,mkPlots=False,update=True):
     '''Starting with initial guesses for culture locations (top left corner), optimise individual culture locations and return locations (centre of spots) data frame.'''
     # radius is half width of spot tile, rad is "radius" of area tested for brightness (0<radnum<=1.0), RAD is half width of search space
-    cols,rows=numpy.meshgrid(numpy.arange(1,nx+1),numpy.arange(1,ny+1))
+    cols,rows=np.meshgrid(np.arange(1,nx+1),np.arange(1,ny+1))
     d={"Row":rows.flatten(),"Column":cols.flatten(),"y":candy,"x":candx}
-    locations=pandas.DataFrame(d)
+    locations=pd.DataFrame(d)
     locations["Diameter"]=min(dx,dy)
     if update:
         radius=float(min(dx,dy))/2.0
@@ -913,11 +913,11 @@ def locateCulturesScan(candx,candy,dx,dy,arrN,nx,ny,search=0.4,radFrac=1.0,mkPlo
     return(locations)
 
 def edgeBrightness(tile):
-    return(numpy.mean(numpy.concatenate((tile[0,:],tile[-1,:],tile[1:-1,0],tile[1:-1,-1]))))
+    return(np.mean(np.concatenate((tile[0,:],tile[-1,:],tile[1:-1,0],tile[1:-1,-1]))))
 
 def locateCultures(candx,candy,dx,dy,arr,nx,ny,update=True,maxupdates=5,fuzzy=0.01,samp=1.0):
     '''Recursively calculate centre of mass for each tile until it converges (or updates maxupdates times).'''
-    cols,rows=numpy.meshgrid(numpy.arange(1,nx+1),numpy.arange(1,ny+1))
+    cols,rows=np.meshgrid(np.arange(1,nx+1),np.arange(1,ny+1))
     cx=list(candx)
     cy=list(candy)
     dx=int(round(dx))
@@ -929,7 +929,7 @@ def locateCultures(candx,candy,dx,dy,arr,nx,ny,update=True,maxupdates=5,fuzzy=0.
         xA,xB=cx0,min((cx0+dx),arr.shape[1]-1)
         tile=arr[yA:yB,xA:xB]
         COM=ndimage.measurements.center_of_mass(tile)
-        if sum(numpy.isnan(COM))>0:
+        if sum(np.isnan(COM))>0:
             COM=(dy/2.0,dx/2.0)
         cy=min(max(0,int(round(cy0+COM[0]-dy/2.0))),arr.shape[0]-1)
         cx=min(max(0,int(round(cx0+COM[1]-dx/2.0))),arr.shape[1]-1)
@@ -945,7 +945,7 @@ def locateCultures(candx,candy,dx,dy,arr,nx,ny,update=True,maxupdates=5,fuzzy=0.
         # Accept latest solution in series that gives edge length within a factor of (1+fuzzy) of the minimum observed
         edges=[r[2] for r in res]
         edgeMin=min(edges)
-        res=[r for r in res if (r[2]<=(1+fuzzy)*edgeMin and numpy.linalg.norm(numpy.array(r[0])-numpy.array(r[1]))<=max(dx,dy)/2.0)]
+        res=[r for r in res if (r[2]<=(1+fuzzy)*edgeMin and np.linalg.norm(np.array(r[0])-np.array(r[1]))<=max(dx,dy)/2.0)]
         sol=res[-1]
         return(sol[0])
 
@@ -954,7 +954,7 @@ def locateCultures(candx,candy,dx,dy,arr,nx,ny,update=True,maxupdates=5,fuzzy=0.
     cy,cx=zip(*posnew)
                 
     d={"Row":rows.flatten(),"Column":cols.flatten(),"y":[cyv+dy/2.0 for cyv in cy],"x":[cxv+dx/2.0 for cxv in cx]}
-    locations=pandas.DataFrame(d)
+    locations=pd.DataFrame(d)
     locations["Diameter"]=min(dx,dy)
     return(locations)
 
@@ -962,7 +962,7 @@ def makeMask(arrN,thresh1,tol=5):
     '''Generate an agar mask and a pseudo-empty image from a plate with obvious cultures.  Cultures are identified by thresholding, cut out and filled using a Markov field update.'''
     # Tolerance for average pixel intensity difference between iterations to declare convergence of Markov update
     # Save final mask for cutting out all cell signal from earlier images
-    finalMask=numpy.ones(arrN.shape,dtype=numpy.bool)
+    finalMask=np.ones(arrN.shape,dtype=np.bool)
     finalMask[arrN<thresh1]=False
     cutout_arr=maskAndFill(arrN,finalMask,tol)
     return (finalMask,cutout_arr)
@@ -974,31 +974,31 @@ def maskAndFill(arrN,finalMask,tol=5):
     finalMask[-1,:]=False
     finalMask[:,0]=False
     finalMask[:,-1]=False
-    cutout_arr=numpy.copy(arrN)
-    cutout_arr[finalMask]=numpy.nan
-    old=numpy.zeros(cutout_arr.shape,dtype=float)
+    cutout_arr=np.copy(arrN)
+    cutout_arr[finalMask]=np.nan
+    old=np.zeros(cutout_arr.shape,dtype=float)
     
-    (y_list,x_list)=numpy.where(finalMask)
+    (y_list,x_list)=np.where(finalMask)
     print("Filling in gaps")
     diff=100*tol
-    while diff>tol or numpy.isnan(diff):
+    while diff>tol or np.isnan(diff):
         # Invert filling order at every pass to minimise bias towards a particular direction
         x_list=x_list[::-1]
         y_list=y_list[::-1]
-        old=numpy.copy(cutout_arr)
+        old=np.copy(cutout_arr)
         # Markov field update
         for i in range(0,len(x_list)):
             plist=[cutout_arr[y_list[i],x_list[i]+1],cutout_arr[y_list[i]+1,x_list[i]],cutout_arr[y_list[i],x_list[i]-1],cutout_arr[y_list[i]-1,x_list[i]]]
             cutout_arr[y_list[i],x_list[i]]=stats.nanmean(plist)
-        diff=numpy.sum(numpy.abs(old-cutout_arr))/numpy.sum(finalMask)
-        diff=numpy.sum(numpy.abs(old*finalMask-cutout_arr*finalMask))/numpy.sum(finalMask)
+        diff=np.sum(np.abs(old-cutout_arr))/np.sum(finalMask)
+        diff=np.sum(np.abs(old*finalMask-cutout_arr*finalMask))/np.sum(finalMask)
     return(cutout_arr)
     
 def makeCorrectionMap(arr0,locations,smoothfactor=250,verbose=True):
     '''Smooth a (pseudo-)empty plate image to generate a correction map.'''
     dy,dx=locations.Diameter[0],locations.Diameter[0]
     smoothed_arr=ndimage.gaussian_filter(arr0,arr0.shape[1]/smoothfactor)
-    average_back=numpy.median(smoothed_arr[numpy.min(locations.y):numpy.max(locations.y),numpy.min(locations.x):numpy.max(locations.x)])
+    average_back=np.median(smoothed_arr[np.min(locations.y):np.max(locations.y),np.min(locations.x):np.max(locations.x)])
     correction_map=average_back/smoothed_arr
     if verbose: print("Lighting correction map constructed.")
     return(correction_map,average_back)
@@ -1014,7 +1014,7 @@ def measureSizeAndColour(locations,arr,im,finalmask,average_back,barcode,filenam
 
 def threshPreview(arr,thresh1,locations):
     '''Generate a preview version of thresholded image with culture locations highlighted (coloured squares).  Suitable for checking that culture location algorithms are functioning.'''
-    imthresh=thresholdArr(numpy.copy(arr),thresh1).convert("RGB")
+    imthresh=thresholdArr(np.copy(arr),thresh1).convert("RGB")
     draw=ImageDraw.Draw(imthresh)
     colours=((255,0,0),(0,255,0),(0,0,255),(255,255,0),(0,255,255),(255,0,255))
     for i in range(0,len(locations.x)):
@@ -1025,8 +1025,8 @@ def threshPreview(arr,thresh1,locations):
 def automaticThreshold(arr,label="",pdf=None):
     '''Choose a threshold for segmenting pixel intensities by fitting two-component Gaussian mixture model'''
     # Initial guess for mixed model parameters for thresholding lighting corrected image
-    (counts,intensities)=numpy.histogram(arr,bins=2**8,range=(0,2**8))
-    intensities=numpy.array(intensities[0:-1],dtype=numpy.int)
+    (counts,intensities)=np.histogram(arr,bins=2**8,range=(0,2**8))
+    intensities=np.array(intensities[0:-1],dtype=np.int)
     smoothcounts=ndimage.gaussian_filter1d(counts,1)
     (bindat,[theta,mu1,mu2,sigma1,sigma2])=initialGuess(intensities,smoothcounts)
     if(pdf!=None):
@@ -1047,20 +1047,20 @@ def automaticThreshold(arr,label="",pdf=None):
         thresh1-=1
 
     # Modelled densities
-    bindat["mixed"]=numpy.array([totFunc(x,opt[0]) for x in bindat.intensities],dtype=numpy.float)
-    bindat["gauss1"]=numpy.array([theta_opt*stats.norm.pdf(x,mu1_opt,sigma1_opt) for x in bindat.intensities],dtype=numpy.float)
-    bindat["gauss2"]=numpy.array([(1.0-theta_opt)*stats.norm.pdf(x,mu2_opt,sigma2_opt) for x in bindat.intensities],dtype=numpy.float)
+    bindat["mixed"]=np.array([totFunc(x,opt[0]) for x in bindat.intensities],dtype=np.float)
+    bindat["gauss1"]=np.array([theta_opt*stats.norm.pdf(x,mu1_opt,sigma1_opt) for x in bindat.intensities],dtype=np.float)
+    bindat["gauss2"]=np.array([(1.0-theta_opt)*stats.norm.pdf(x,mu2_opt,sigma2_opt) for x in bindat.intensities],dtype=np.float)
     return((thresh1,bindat))
 
 def openQFA(fname):
     '''Reads tab-delimited QFA data, processes it and returns dataframe'''
-    res=pandas.read_csv(fname,sep="\t")
+    res=pd.read_csv(fname,sep="\t")
     # Tidy up columns (maybe add these lines to a read-in-data function instead?)
     if "Treatments" in res.columns:
         res.rename(columns={"Treatments":"Treatment","X.Offset":"XOffset","Y.Offset":"YOffset","Tile.Dimensions.X":"TileX","Tile.Dimensions.Y":"TileY"},inplace=True)
     res["TreatMed"]=res["Treatment"].map(str)+"_"+res["Medium"].map(str)
     res=res.dropna(axis=0,how="all")
-    res=res[pandas.notnull(res["Treatment"])]
+    res=res[pd.notnull(res["Treatment"])]
     return(res)
 
 def pad(x,zeros=2):
@@ -1089,8 +1089,9 @@ def viewerSummary(res):
     print ("")
 
 def getDate(x,fmt="%Y-%m-%d_%H-%M-%S"):
+    lenf=len(time.strftime(fmt))
     try:
-        dt=datetime.strptime(x.split(".")[-2][-19:],fmt)
+        dt=datetime.strptime(x.split(".")[-2][(-1*lenf):],fmt)
     except:
         dt=datetime(9999,1,1)
     return(dt)    
@@ -1104,7 +1105,7 @@ def getNearest(barcs,exptTime=1.0):
         datediffs=[date-first for date in dates]
         diffs=[(x.total_seconds()/(60*60*24.0))-exptTime for x in datediffs]
         absdiffs=[abs(diff) for diff in diffs]
-        bestind=numpy.argmin(absdiffs)
+        bestind=np.argmin(absdiffs)
         closestImage[b]=barcs[b][bestind]
     return(closestImage)
 
@@ -1118,9 +1119,9 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
     '''Make a html preview of images listed in res, columns by "horizonal", filename htmlroot, report title, genes to highlight colour:list.'''
     # List of possible identifiers, by which experiment can be separated
     # If we need to sort final image differently, sort this list appropriately
-    hitThresh=numpy.percentile(res["fit"],hitPercentile)
+    hitThresh=np.percentile(res["fit"],hitPercentile)
     if deadPercentile>=0.0:
-        deadThresh=numpy.percentile(res["fit"],deadPercentile)
+        deadThresh=np.percentile(res["fit"],deadPercentile)
     else:
         deadThresh=-9999999999
     All_IDs=["MasterPlate.Number","RepQuad","Screen.Name","Condition","Library.Name","Treatment","Medium","Inoc"]
@@ -1331,3 +1332,78 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
     fout=open(os.path.join(outPath,htmlroot+'_NOMAP.html'),'w')
     fout.write(SGAString+KeyString+'<map name="ImageMap">'+plateString+"</map></body></html>")
     fout.close()
+
+def parseColonyzer(fname,fmt="%Y-%m-%d_%H-%M-%S"):
+    '''Read in Colonyzer .out file and parse some info from filename.'''
+    lenf=len(time.strftime(fmt))
+    froot=os.path.basename(fname).split(".")[0]
+    barc=froot[0:(-1*(lenf+1))]
+    datetime=froot[(-1*lenf):]
+    data=pd.read_csv(fname,sep="\t",header=0)
+    data["Barcode"]=barc
+    data["DateTime"]=datetime
+    data["FileName"]=froot
+    return(data)
+
+def getORF(libs,Library,Plate,Row,Column):
+    '''Get ORF at a given row, column and plate in a particular QFA library, found in dataframe libs describing all available libraries.'''
+    filt=libs.ORF[(libs.Library==Library)&(libs.Plate==Plate)&(libs.Row==Row)&(libs.Column==Column)]
+    return(filt.get_values()[0])
+
+def parseAndCombine(imOutDir=".",exptDesc="ExptDescription.txt",libDesc="LibraryDescription.txt",geneToORF="ORF2GENE.txt",fout="ColonyzerOutput.txt",fmt="%Y-%m-%d_%H-%M-%S"):
+    '''Read in a list of colonyzer output files, together with optional metadata files describing inoculation times, strains, treatments applied etc. to produce one summary output file.'''
+    # Read in and combine all .out files
+    imListROOT=os.listdir(imOutDir)
+    # Check any OutputData directory if it exists
+    imListOD=[os.path.join("Output_Data",x) for x in os.listdir(os.path.join(imOutDir,"Output_Data"))]
+    imList=imListROOT+imListOD
+    outs=[parseColonyzer(os.path.join(imOutDir,out),fmt) for out in imList if ".out" in out]
+    ims=pd.concat(outs)
+    
+    try:
+        # Read in experimental metadata
+        expt=pd.read_csv(exptDesc,sep="\t",header=0)
+    except:
+        print(exptDesc+" not found, carrying on...")
+        expt=None
+        
+    try:
+        # Read in library description file
+        libs=pd.read_csv(libDesc,sep="\t",header=0)
+        libs.columns=[x.rstrip() for x in libs.columns]
+    except:
+        print(libDesc+" not found, carrying on...")
+        libs=None
+
+    try:
+        # Read in file describing link between standard gene name and systematic gene name (ORF) as python dictionary orf2g
+        g2orf_df=pd.read_csv(geneToORF,sep="\t",header=None)
+        orf2g=dict(zip(g2orf_df[0],g2orf_df[1]))
+    except:
+        print(geneToORF+" not found, carrying on...")
+        orf2g=None
+
+    if expt is not None:
+        # Add metadata from expt to ims
+        ims["Start.Time"]=[expt["Start.Time"][expt.Barcode==barc].get_values()[0] for barc in ims["Barcode"]]
+        ims["Treatment"]=[expt["Treatment"][expt.Barcode==barc].get_values()[0] for barc in ims["Barcode"]]
+        ims["Medium"]=[expt["Medium"][expt.Barcode==barc].get_values()[0] for barc in ims["Barcode"]]
+        ims["Screen"]=[expt["Screen"][expt.Barcode==barc].get_values()[0] for barc in ims["Barcode"]]
+        ims["Library"]=[expt["Library"][expt.Barcode==barc].get_values()[0] for barc in ims["Barcode"]]
+        ims["Plate"]=[expt["Plate"][expt.Barcode==barc].get_values()[0] for barc in ims["Barcode"]]
+        ims["RepQuad"]=[expt["RepQuad"][expt.Barcode==barc].get_values()[0] for barc in ims["Barcode"]]
+
+        # Calculate time since inoculation date time (from expt metadata) that image was taken
+        ims["ExptTime"]=(pd.to_datetime(ims["DateTime"],format=fmt)-pd.to_datetime(ims["Start.Time"],format=fmt))/np.timedelta64(1,"D")
+
+        if libs is not None:
+            # Get ORFs at each position from relevant library description
+            ims["ORF"]=[getORF(libs,l,p,r,c) for l,p,r,c in zip(ims.Library,ims.Plate,ims.Row,ims.Column)]
+
+        if orf2g is not None and libs is not None:
+            # Get standard gene names for each ORF
+            ims["Gene"]=[orf2g[orf] for orf in ims.ORF]
+
+    # Write data, metadata and newly calulated times to file
+    ims.to_csv(fout,sep="\t")
+    return(ims)
