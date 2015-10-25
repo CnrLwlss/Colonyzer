@@ -701,9 +701,9 @@ def sizeSpots(locations,arr,thresharr,edge,background=0):
             circularity=0
         featureMedian=np.median(tile[threshtile])/intMax
         backgroundMedian=np.median(tile[np.logical_not(threshtile)])/intMax
-        sumInt.append(float(np.sum(tile))/(float(tile.size)*intMax))
-        sumArea.append(float(area)/float(tile.size))
-        trim.append(float(np.sum(tile[threshtile]))/(float(tile.size)*intMax))
+        sumInt.append(max(0,float(np.sum(tile))/(float(tile.size)*intMax)))
+        sumArea.append(max(0,float(area)/float(tile.size)))
+        trim.append(max(0,float(np.sum(tile[threshtile]))/(float(tile.size)*intMax)))
         fMed.append(featureMedian/intMax)
         bMed.append(backgroundMedian/intMax)
         circ.append(circularity)
