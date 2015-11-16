@@ -229,7 +229,6 @@ def main(inp=""):
         locationsN=c2.locateCultures([int(round(cx-dx/2.0)) for cx in candx],[int(round(cy-dy/2.0)) for cy in candy],dx,dy,arrloc,ncol,nrow,update=True)
 
         mask=edgeFill(arr0,locationsN,dx,dy,0.8)
-        c2.showIm(mask)
         if correction:
             if cut:
                 startFill=time.time()
