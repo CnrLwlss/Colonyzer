@@ -4,6 +4,9 @@ import os
 import subprocess
 
 # http://stackoverflow.com/questions/4505747/how-should-i-structure-a-python-package-that-contains-cython-code
+# Note that this package requires 'numpy>=1.9.0','scipy>=0.14.1','pandas','matplotlib','pillow','sobol'
+# These have not been added to the install_requires list in setup as that leads to very inefficient
+# re-compilation of dependencies, even when compatible versions are already available
 
 def git_version():
     def _minimal_ext_cmd(cmd):
@@ -28,7 +31,7 @@ def git_version():
 
     return GIT_REVISION
 
-version='1.1.03'
+version='1.1.04'
 VERSION=version+"."+git_version()
 f=open('colonyzer2/version.py',"w")
 f.write("__version__='{}'".format(VERSION))
@@ -61,7 +64,6 @@ setup(name='Colonyzer2',
         'Topic :: Scientific/Engineering :: Image Recognition',
         'Intended Audience :: Science/Research'
         ],
-      install_requires=['numpy>=1.9.0','scipy>=0.14.1','pandas','matplotlib','pillow','sobol'],
       ext_modules=ext_modules,
       include_dirs=[numpy.get_include()]
       )

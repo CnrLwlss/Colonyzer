@@ -38,6 +38,7 @@ def parseArgs(inp=''):
     parser.add_argument("-x","--cut", help="Cut culture signal from first image to make pseudo-empty plate?", action="store_true")
     parser.add_argument("-q","--quiet", help="Suppress messages printed to screen during analysis?", action="store_true")
     parser.add_argument("-e","--endpoint", help="Only analyse final image in series.  Mostly for testing single image analysis.",action="store_true")
+    parser.add_argument("-k","--edgemask", help="Use intensity gradient & morphology for image segmentation instead of thresholding.",action="store_true")
     
     parser.add_argument("-d","--dir", type=str, help="Directory in which to search for image files that have not been analysed (current directory by default).",default=".")
     parser.add_argument("-l","--logsdir", type=str, help="Directory in which to search for JSON files listing images for analyis (e.g. LOGS3, root of HTS filestore).  Only used when intending to specify images for analysis in .json file (see -u).",default=".")
@@ -66,7 +67,7 @@ def buildVars(inp=''):
     else:
         fdir=os.path.realpath(inp.dir)
 
-    if inp.fixthresh!=None:
+    if inp.fixthresh!=None and not inp.edgemask:
         fixedThresh=inp.fixthresh
     else:
         fixedThresh=-99
@@ -116,13 +117,15 @@ def buildVars(inp=''):
                 cut=True
             else:
                 print("Using first plate (without segmenting) as best estimate of pseudo-empty plate (for lighting correction).")
-        if fixedThresh==-99:
+        if fixedThresh==-99 and not inp.edgemask:
             print("Image segmentation by automatic thresholding.")
-        else:
+        elif not inp.edgemask:
             print("Images will be segmented using fixed threshold: "+str(fixedThresh)+".")
+        else:
+            print("Images will be segemented by intensity gradient and morphology instead of by thresholding.")
         if fdict is not None and os.path.exists(fdict):
             print("Preparing to load barcodes from "+fdict+".")
-    res={'lc':inp.lc,'fixedThresh':fixedThresh,'plots':inp.plots,'initpos':inp.initpos,'fdict':fdict,'fdir':fdir,'nrow':nrow,'ncol':ncol,'cut':cut,'verbose':verbose,'diffims':diffIms,'updates':inp.updates,'endpoint':inp.endpoint}
+    res={'lc':inp.lc,'fixedThresh':fixedThresh,'plots':inp.plots,'initpos':inp.initpos,'fdict':fdict,'fdir':fdir,'nrow':nrow,'ncol':ncol,'cut':cut,'verbose':verbose,'diffims':diffIms,'updates':inp.updates,'endpoint':inp.endpoint,'edgemask':inp.edgemask}
     return(res)
 
 def locateJSON(scrID,dirHTS='.',verbose=False):
@@ -168,7 +171,7 @@ def cutEdgesFromMask(mask,locations,dx,dy):
     return(mask)
 
 def edgeFill(arr,locations,dx,dy,cutoff=0.8):
-    edgeN=c2.getEdges(arr,cutoff=0.8)
+    edgeN=c2.getEdges(arr,cutoff=cutoff)
     dilN=ndimage.morphology.binary_dilation(edgeN,iterations=2)
     erodeN=ndimage.morphology.binary_erosion(dilN,iterations=1)
     dil2N=ndimage.morphology.binary_dilation(dilN,iterations=3)
@@ -183,7 +186,7 @@ def main(inp=""):
     cythonFill=False
 
     var=buildVars(inp=inp)
-    correction,fixedThresh,plots,initpos,fdict,fdir,nrow,ncol,cut,verbose,diffIms,updates,endpoint=(var["lc"],var["fixedThresh"],var["plots"],var["initpos"],var["fdict"],var["fdir"],var["nrow"],var["ncol"],var["cut"],var["verbose"],var["diffims"],var["updates"],var["endpoint"])
+    correction,fixedThresh,plots,initpos,fdict,fdir,nrow,ncol,cut,verbose,diffIms,updates,endpoint,edgemask=(var["lc"],var["fixedThresh"],var["plots"],var["initpos"],var["fdict"],var["fdir"],var["nrow"],var["ncol"],var["cut"],var["verbose"],var["diffims"],var["updates"],var["endpoint"],var["edgemask"])
     barcdict=checkImages(fdir,fdict,verbose=verbose)
     rept=c2.setupDirectories(barcdict,verbose=verbose)
 
@@ -225,9 +228,10 @@ def main(inp=""):
         # Update guesses and initialise locations data frame
         locationsN=c2.locateCultures([int(round(cx-dx/2.0)) for cx in candx],[int(round(cy-dy/2.0)) for cy in candy],dx,dy,arrloc,ncol,nrow,update=True)
 
+        mask=edgeFill(arr0,locationsN,dx,dy,0.8)
+        c2.showIm(mask)
         if correction:
             if cut:
-                mask=edgeFill(arr0,locationsN,dx,dy,0.8)
                 startFill=time.time()
                 if cythonFill:
                     pseudoempty=c2.maskAndFillCython(arr0,maskN,0.005)
@@ -249,13 +253,16 @@ def main(inp=""):
 
         # Trim outer part of image to remove plate walls
         trimmed_arrN=corrected_arrN[max(0,int(round(min(locationsN.y)-dy/2.0))):min(arrN.shape[0],int(round((max(locationsN.y)+dy/2.0)))),max(0,int(round(min(locationsN.x)-dx/2.0))):min(arrN.shape[1],int(round((max(locationsN.x)+dx/2.0))))]
-        
-        if fixedThresh>=0:
-            thresh=fixedThresh
+
+        if edgemask:
+            thresh=-99
         else:
-            (thresh,bindat)=c2.automaticThreshold(trimmed_arrN,BARCODE,pdf=pdf)
-            if plots:
-                c2.plotModel(bindat,label=BARCODE,pdf=pdf)
+            if fixedThresh>=0:
+                thresh=fixedThresh
+            else:
+                (thresh,bindat)=c2.automaticThreshold(trimmed_arrN,BARCODE,pdf=pdf)
+                if plots:
+                    c2.plotModel(bindat,label=BARCODE,pdf=pdf)
 
         # Mask for identifying culture areas
         maskN=np.ones(arrN.shape,dtype=np.bool)
@@ -284,8 +291,9 @@ def main(inp=""):
             else:
                 threshadj=thresh
 
-            mask=np.ones(arr.shape,dtype=np.bool)
-            mask[corrected_arrN<threshadj]=False
+            if not edgemask:
+                mask=np.ones(arr.shape,dtype=np.bool)
+                mask[corrected_arrN<threshadj]=False
 
             # Measure culture phenotypes
             locations=c2.measureSizeAndColour(locationsN,arr,im,mask,average_back,BARCODE,FILENAME[0:-4])
@@ -295,7 +303,10 @@ def main(inp=""):
             dataf=c2.saveColonyzer(os.path.join(os.path.dirname(FILENAME),"Output_Data",os.path.basename(FILENAME).split(".")[0]+".dat"),locations,threshadj,dx,dy)
 
             # Visual check of culture locations
-            imthresh=c2.threshPreview(arr,threshadj,locations)
+            if edgemask:
+                imthresh=c2.threshPreview(locations,mask,None)
+            else:
+                imthresh=c2.threshPreview(locations,arr,threshadj)
             r=5
             draw=ImageDraw.Draw(imthresh)
             draw.ellipse((com[1]-r,com[0]-r,com[1]+r,com[0]+r),fill=(255,0,0))

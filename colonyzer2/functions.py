@@ -531,9 +531,6 @@ def plotAC(sumy,sumx,candy,candx,maximay,maximax,pdf=None,main=""):
         plt.close()
     return()
     
-    
-    
-
 def initialGuess(intensities,counts):
     '''Construct non-parametric guesses for distributions of two components and use these to estimate Gaussian parameters'''
     # Get all maxima
@@ -699,15 +696,23 @@ def sizeSpots(locations,arr,thresharr,edge,background=0):
             circularity=4*math.pi*area/(perimeter)**2
         else:
             circularity=0
-        featureMedian=np.median(tile[threshtile])/intMax
-        backgroundMedian=np.median(tile[np.logical_not(threshtile)])/intMax
+        tthresh=tile[threshtile]
+        if tthresh.size>1:
+            featureMedian=np.median(tthresh/intMax)
+            featureVariance=np.var(tthresh/intMax)
+            allTrim=float(np.sum(tthresh))/(float(tile.size)*intMax)
+        else:
+            featureMedian=featureVariance=allTrim=0
+        bkgrnd=tile[np.logical_not(threshtile)]
+        if bkgrnd.size>1:
+            backgroundMedian=np.median(bkgrnd/intMax)
         sumInt.append(max(0,float(np.sum(tile))/(float(tile.size)*intMax)))
         sumArea.append(max(0,float(area)/float(tile.size)))
-        trim.append(max(0,float(np.sum(tile[threshtile]))/(float(tile.size)*intMax)))
-        fMed.append(featureMedian/intMax)
-        bMed.append(backgroundMedian/intMax)
+        trim.append(max(0,allTrim))
+        fMed.append(featureMedian)
+        bMed.append(backgroundMedian)
         circ.append(circularity)
-        fVar.append(np.var(tile[threshtile]/intMax))
+        fVar.append(featureVariance)
         perim.append(float(perimeter)/float(tile.size))
     locations["Intensity"]=sumInt
     locations["Area"]=sumArea
@@ -1012,9 +1017,12 @@ def measureSizeAndColour(locations,arr,im,finalmask,average_back,barcode,filenam
     locations["Filename"]=os.path.basename(filename).split(".")[0]
     return(locations)
 
-def threshPreview(arr,thresh1,locations):
+def threshPreview(locations,arr,thresh1=None):
     '''Generate a preview version of thresholded image with culture locations highlighted (coloured squares).  Suitable for checking that culture location algorithms are functioning.'''
-    imthresh=thresholdArr(np.copy(arr),thresh1).convert("RGB")
+    if arr.max()==1 and arr.min()==0: # if arr is a mask
+        imthresh=thresholdArr(np.copy(arr)*255.0,127.5).convert("RGB")
+    else:
+        imthresh=thresholdArr(np.copy(arr),thresh1).convert("RGB")
     draw=ImageDraw.Draw(imthresh)
     colours=((255,0,0),(0,255,0),(0,0,255),(255,255,0),(0,255,255),(255,0,255))
     for i in range(0,len(locations.x)):
@@ -1295,7 +1303,10 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
                 dat["bry"]=dat["tly"]+scaley*dat["TileY"]
                 for ind,dRow in dat.iterrows():
                     inputs=(int(round(dRow["tlx"])),int(round(dRow["tly"])),int(round(dRow["brx"])),int(round(dRow["bry"])),dRow["Gene"],dRow["ORF"])
-                    mapString+='<area shape="rect" coords="%i,%i,%i,%i" title="%s" href="http://www.yeastgenome.org/cgi-bin/locus.fpl?locus=%s" alt=""/>\n'%inputs
+                    if dRow["ORF"][0:2]=="SP" and "." in dRow["ORF"]:
+                        mapString+='<area shape="rect" coords="%i,%i,%i,%i" title="%s" href="http://www.pombase.org/spombe/result/%s" alt=""/>\n'%inputs
+                    else:
+                        mapString+='<area shape="rect" coords="%i,%i,%i,%i" title="%s" href="http://www.yeastgenome.org/cgi-bin/locus.fpl?locus=%s" alt=""/>\n'%inputs
                     if dRow["fit"]>hitThresh:
                             for d in range(0,1):
                                 draw.rectangle((int(round(dRow["tlx"]*scl))-d,int(round(dRow["tly"]*scl))-d,int(round(dRow["brx"]*scl))+d,int(round(dRow["bry"]*scl))+d),outline="white")
