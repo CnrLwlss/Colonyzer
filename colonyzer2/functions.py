@@ -37,7 +37,7 @@ def readInstructions(fullpath,fname='Colonyzer.txt',searchUpStream=False):
         InsTemp=Instructions.readlines()
         defaultArr=[]
         for x in range(0,len(InsTemp)):
-            if InsTemp[x][0]!="#" and InsTemp[x][0]!="\n":
+            if InsTemp[x][0] not in ["#","\n","\r"]:
                 tlist=InsTemp[x].split(',')
                 # default with no date specified
                 if len(tlist)==6 and tlist[0]=='default':
@@ -904,8 +904,8 @@ def openImage(imName):
 def locateCulturesScan(candx,candy,dx,dy,arrN,nx,ny,search=0.4,radFrac=1.0,mkPlots=False,update=True):
     '''Starting with initial guesses for culture locations (top left corner), optimise individual culture locations and return locations (centre of spots) data frame.'''
     # radius is half width of spot tile, rad is "radius" of area tested for brightness (0<radnum<=1.0), RAD is half width of search space
-    cols,rows=np.meshgrid(np.arange(1,nx+1),np.arange(1,ny+1))
-    d={"Row":rows.flatten(),"Column":cols.flatten(),"y":candy,"x":candx}
+    colvals,rowvals=np.meshgrid(np.arange(1,nx+1),np.arange(1,ny+1))
+    d={"Row":rowvals.flatten(),"Column":colvals.flatten(),"y":candy,"x":candx}
     locations=pd.DataFrame(d)
     locations["Diameter"]=min(dx,dy)
     if update:
@@ -959,14 +959,17 @@ def locateCultures(candx,candy,dx,dy,arr,nx,ny,update=True,maxupdates=5,fuzzy=0.
         edges=[r[2] for r in res]
         edgeMin=min(edges)
         res=[r for r in res if (r[2]<=(1+fuzzy)*edgeMin and np.linalg.norm(np.array(r[0])-np.array(r[1]))<=max(dx,dy)/2.0)]
-        sol=res[-1]
-        return(sol[0])
+        if len(res)>0:
+            sol=res[-1]
+            return(sol[0])
+        else:
+            return(pos)
 
     if update:
         posnew=[updateLocation(p) for p in zip(cy,cx)]
     cy,cx=zip(*posnew)
                 
-    d={"Row":rows.flatten(),"Column":cols.flatten(),"y":[cyv+dy/2.0 for cyv in cy],"x":[cxv+dx/2.0 for cxv in cx]}
+    d={"Row":rowvals.flatten(),"Column":colvals.flatten(),"y":[cyv+dy/2.0 for cyv in cy],"x":[cxv+dx/2.0 for cxv in cx]}
     locations=pd.DataFrame(d)
     locations["Diameter"]=min(dx,dy)
     return(locations)
