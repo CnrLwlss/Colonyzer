@@ -19,12 +19,20 @@ def is_number(s):
     except ValueError:
         return False
 
-def readInstructions(fullpath,fname='Colonyzer.txt'):
+def readInstructions(fullpath,fname='Colonyzer.txt',searchUpStream=False):
     '''Read instruction file output by ColonyzerParametryzer.'''
     # Try to read in the Colonyzer input file
+    if searchUpStream:
+        while not os.path.isfile(os.path.join(fullpath,fname)):
+            fullpathnew=os.path.abspath(os.path.join(fullpath,".."))
+            if fullpathnew!=fullpath:
+                fullpath=fullpathnew
+            else:
+                raise(ValueError("Searched up to "+fullpath+" but "+fname+" not found in directory structure."))
     fpath=os.path.join(fullpath,fname)
     InsData={}
     if os.path.isfile(fpath):
+        print("Reading instruction file output from "+fpath)
         Instructions=open(fpath,'r')
         InsTemp=Instructions.readlines()
         defaultArr=[]

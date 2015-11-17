@@ -214,7 +214,7 @@ def main(inp=""):
             im0,arr0=c2.openImage(EARLIESTIMAGE)
             arrloc=np.maximum(0,arrN-arr0)
         if initpos:
-            InsData=c2.readInstructions(os.path.dirname(LATESTIMAGE))
+            InsData=c2.readInstructions(os.path.dirname(LATESTIMAGE),searchUpStream=True)
             # Load initial guesses from Colonyzer.txt file
             (candx,candy,dx,dy)=loadLocationGuesses(LATESTIMAGE,InsData)
             corner=[0,0]; com=[0,0]; guess=[0,0]
