@@ -958,17 +958,19 @@ def locateCultures(candx,candy,dx,dy,arr,nx,ny,update=True,maxupdates=5,fuzzy=0.
         # Accept latest solution in series that gives edge length within a factor of (1+fuzzy) of the minimum observed
         edges=[r[2] for r in res]
         edgeMin=min(edges)
-        res=[r for r in res if (r[2]<=(1+fuzzy)*edgeMin and np.linalg.norm(np.array(r[0])-np.array(r[1]))<=max(dx,dy)/2.0)]
-        if len(res)>0:
-            sol=res[-1]
-            return(sol[0])
-        else:
-            return(pos)
+        res_sort=[r for r in res if (r[2]<=(1+fuzzy)*edgeMin and np.linalg.norm(np.array(r[0])-np.array(r[1]))<=max(dx,dy)/2.0)]
+        if len(res_sort)>0:
+            sol=res_sort[-1]
+            # Only update if brightness has increased by a factor of less than 2, otherwise likely an error
+            if sol[3]<2*res[0][3]:
+                return(sol[0])
+        return(pos)
 
     if update:
         posnew=[updateLocation(p) for p in zip(cy,cx)]
     cy,cx=zip(*posnew)
-                
+    
+    colvals,rowvals=np.meshgrid(np.arange(1,nx+1),np.arange(1,ny+1))
     d={"Row":rowvals.flatten(),"Column":colvals.flatten(),"y":[cyv+dy/2.0 for cyv in cy],"x":[cxv+dx/2.0 for cxv in cx]}
     locations=pd.DataFrame(d)
     locations["Diameter"]=min(dx,dy)
