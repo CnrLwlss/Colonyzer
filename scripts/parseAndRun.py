@@ -212,7 +212,8 @@ def main(inp=""):
             arrloc=arrN
         else:
             im0,arr0=c2.openImage(EARLIESTIMAGE)
-            arrloc=np.maximum(0,arrN-arr0)
+            arrloc=arrN-arr0
+            #arrloc=np.maximum(0,arrloc)
         if initpos:
             InsData=c2.readInstructions(os.path.dirname(LATESTIMAGE),searchUpStream=True)
             # Load initial guesses from Colonyzer.txt file
@@ -285,7 +286,7 @@ def main(inp=""):
                 meanPx=np.mean(arrsm[np.logical_not(masksm)])
 
                 arr=arr+(average_back-meanPx)
-                arr=np.maximum(0,arr)
+                #arr=np.maximum(0,arr)
                 threshadj=thresh+(average_back-meanPx)
             else:
                 threshadj=thresh
