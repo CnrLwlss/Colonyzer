@@ -1313,6 +1313,8 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
     else:
         imnames=[htmlroot+'_%04d.jpeg'%i for i in range(len(closestImage))]
         posimnames=[htmlroot+'_%04dPOS.jpeg'%i for i in range(len(closestImage))]
+    htmlname="index.html"
+    nomapname="nomap.html"
     overlayname='OVERLAY.gif'
         
     draw = ImageDraw.Draw(plateOver)
@@ -1400,15 +1402,15 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
 '''%(smw*col,smw,str(h))
 
     for i in range(len(closestImage)):
-        plateArr[i].save(os.path.join(outPath,imname[i]),quality=100)
-        platePosArr[i].save(os.path.join(outPath,posimname[i]),quality=100)
+        plateArr[i].save(os.path.join(outPath,imnames[i]),quality=100)
+        platePosArr[i].save(os.path.join(outPath,posimnames[i]),quality=100)
     plateOver.save(os.path.join(outPath,overlayname),transparency=0)
-    fout=open(os.path.join(outPath,htmlroot+'.html'),'w')
+    fout=open(os.path.join(outPath,htmlname),'w')
     fout.write(SGAString+KeyString+'<map name="ImageMap">'+mapString+plateString+"</map></body></html>")
     fout.close()
     makeCSS(fname=os.path.join(outpath,"imbrowse.css"))
 
-    fout=open(os.path.join(outPath,htmlroot+'_NOMAP.html'),'w')
+    fout=open(os.path.join(outPath,nomapname),'w')
     fout.write(SGAString+KeyString+'<map name="ImageMap">'+plateString+"</map></body></html>")
     fout.close()
 
