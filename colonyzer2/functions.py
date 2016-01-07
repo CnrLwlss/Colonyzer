@@ -1327,9 +1327,9 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
     SGAString=makeHEAD(imnames+posimnames)
     SGAString+="""
     <body onload='setPicture();'>
-    <img src="" title="Plate image array" width="%s"/>
-    <img src="%s_OVERLAY.gif" usemap="#ImageMap" width="%s"/>
-    """%(str(smw*W),htmlroot,str(smw*W))
+    <img src="" title="Plate image array" id="imagetochange" width="%s"/>
+    <img src="%s" usemap="#ImageMap" width="%s"/>
+    """%(str(smw*W),overlayname,str(smw*W))
 
     for colour in highlight:
         highlight[colour]=[x.upper() for x in highlight[colour]]
@@ -1355,7 +1355,7 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
                 for climind,clim in enumerate(closestImage):
                     impath=clim[barc]
                     imroot=os.path.basename(impath).split(".")[0]
-                    pospath=os.path.join(os.path.dirname(impath),"Output_Images",imroot+"GriddedThresh.png")
+                    pospath=os.path.join(os.path.dirname(impath),"Output_Images",imroot+".png")
                     im=Image.open(impath).resize((int(round(scl*smw)),int(round(scl*smh))),Image.ANTIALIAS)
                     if(os.path.exists(pospath)):
                         posim=Image.open(pospath).resize((int(round(scl*smw)),int(round(scl*smh))),Image.ANTIALIAS)
