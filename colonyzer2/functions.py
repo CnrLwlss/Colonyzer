@@ -1408,7 +1408,7 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
     fout=open(os.path.join(outPath,htmlname),'w')
     fout.write(SGAString+KeyString+'<map name="ImageMap">'+mapString+plateString+"</map></body></html>")
     fout.close()
-    makeCSS(fname=os.path.join(outpath,"imbrowse.css"))
+    makeCSS(fname=os.path.join(outPath,"imbrowse.css"))
 
     fout=open(os.path.join(outPath,nomapname),'w')
     fout.write(SGAString+KeyString+'<map name="ImageMap">'+plateString+"</map></body></html>")
