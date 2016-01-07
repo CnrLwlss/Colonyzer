@@ -1204,7 +1204,7 @@ def makeSCRIPT(ims):
     }}
     function updatePicture()
     {{
-        index=(index+1)\%numim
+        index=(index+1)%numim
     }}
 </script>
 '''.format(imlst)
@@ -1360,6 +1360,7 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
                     if(os.path.exists(pospath)):
                         posim=Image.open(pospath).resize((int(round(scl*smw)),int(round(scl*smh))),Image.ANTIALIAS)
                     else:
+                        print(pospath)
                         posim=im
                     plateArr[climind].paste(im,(int(round(col*smw*scl)),int(round(row*smh*scl))))
                     platePosArr[climind].paste(posim,(int(round(col*smw*scl)),int(round(row*smh*scl))))
