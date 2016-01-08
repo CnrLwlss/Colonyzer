@@ -927,7 +927,11 @@ def locateCulturesScan(candx,candy,dx,dy,arrN,nx,ny,search=0.4,radFrac=1.0,mkPlo
     return(locations)
 
 def edgeBrightness(tile):
-    return(np.mean(np.concatenate((tile[0,:],tile[-1,:],tile[1:-1,0],tile[1:-1,-1]))))
+    '''Sum up the values (brightnesses) along the edge of a 2D array (tile from a monochrome image).'''
+    if tile.size<=0:
+        return(99999999999)
+    else:
+        return(np.mean(np.concatenate((tile[0,:],tile[-1,:],tile[1:-1,0],tile[1:-1,-1]))))
 
 def locateCultures(candx,candy,dx,dy,arr,nx,ny,update=True,maxupdates=5,fuzzy=0.01,samp=1.0):
     '''Recursively calculate centre of mass for each tile until it converges (or updates maxupdates times).'''
