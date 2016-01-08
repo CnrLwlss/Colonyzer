@@ -1031,7 +1031,7 @@ def measureSizeAndColour(locations,arr,im,finalmask,average_back,barcode,filenam
     locations["Filename"]=os.path.basename(filename).split(".")[0]
     return(locations)
 
-def threshPreview(locations,arr,thresh1=None,linethick=5,circlerad=5):
+def threshPreview(locations,arr,thresh1=None,linethick=10,circlerad=10):
     '''Generate a preview version of thresholded image with culture locations highlighted (coloured squares).  Suitable for checking that culture location algorithms are functioning.'''
     if arr.max()==1 and arr.min()==0: # if arr is a mask
         imthresh=thresholdArr(np.copy(arr)*255.0,127.5).convert("RGB")
@@ -1362,6 +1362,7 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
                     if(os.path.exists(pospath)):
                         posim=Image.open(pospath).resize((int(round(scl*smw)),int(round(scl*smh))),Image.ANTIALIAS)
                     else:
+                        print("Preview file missing.  Analysis not complete?")
                         print(pospath)
                         posim=im
                     plateArr[climind].paste(im,(int(round(col*smw*scl)),int(round(row*smh*scl))))
