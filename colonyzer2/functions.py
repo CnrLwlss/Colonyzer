@@ -1031,7 +1031,7 @@ def measureSizeAndColour(locations,arr,im,finalmask,average_back,barcode,filenam
     locations["Filename"]=os.path.basename(filename).split(".")[0]
     return(locations)
 
-def threshPreview(locations,arr,thresh1=None):
+def threshPreview(locations,arr,thresh1=None,linethick=5,circlerad=5):
     '''Generate a preview version of thresholded image with culture locations highlighted (coloured squares).  Suitable for checking that culture location algorithms are functioning.'''
     if arr.max()==1 and arr.min()==0: # if arr is a mask
         imthresh=thresholdArr(np.copy(arr)*255.0,127.5).convert("RGB")
@@ -1041,7 +1041,9 @@ def threshPreview(locations,arr,thresh1=None):
     colours=((255,0,0),(0,255,0),(0,0,255),(255,255,0),(0,255,255),(255,0,255))
     for i in range(0,len(locations.x)):
         x,y,r=int(round(locations.x[i])),int(round(locations.y[i])),int(round(float(locations.Diameter[i])/2.0))
-        draw.rectangle((x-r,y-r,x+r,y+r),outline=colours[i%5])
+        for delta in range(linethick):
+            draw.rectangle((x-r+delta,y-r+delta,x+r-delta,y+r-delta),outline=colours[i%5])
+            draw.ellipse((x-circlerad,y-circlerad,x+circlerad,y+circlerad),fill=colours[i%5])
     return(imthresh)
 
 def automaticThreshold(arr,label="",pdf=None):
