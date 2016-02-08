@@ -1295,10 +1295,15 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
     for im in imList:
         for b in im["Barcode"].unique():
             allBarcs.append(b)
-
-    exampleFName=closestImage[0][allBarcs[0]]
-    exampleIm=Image.open(exampleFName)
-    (imw,imh)=exampleIm.size
+    wset,hset,alst=set(),set(),set()
+    for barc in allBarcs:
+        impath=clim[barc]
+        imroot=os.path.basename(impath).split(".")[0]
+        w,h=Image.open(impath).size
+        wlst.add(w)
+        hlst.add(h)
+        plst.add(float(w)/float(h))
+    (imw,imh)=(max(wlst),max(hlst))
 
     smh=int(round(float(imh)*float(smw)/float(imw)))
 
@@ -1363,7 +1368,13 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
                     impath=clim[barc]
                     imroot=os.path.basename(impath).split(".")[0]
                     pospath=os.path.join(os.path.dirname(impath),"Output_Images",imroot+".png")
-                    im=Image.open(impath).resize((int(round(scl*smw)),int(round(scl*smh))),Image.ANTIALIAS)
+                    im=Image.open(impath)
+                    imw,imh=Image.open(impath).size
+                    smh=int(round(float(imh)*float(smw)/float(imw)))
+                    # Scale factors for coordinates of preview images
+                    scalex=(float(smw)/float(imw))
+                    scaley=(float(smh)/float(imh))
+                    im.resize((int(round(scl*smw)),int(round(scl*smh))),Image.ANTIALIAS)
                     if(os.path.exists(pospath)):
                         posim=Image.open(pospath).resize((int(round(scl*smw)),int(round(scl*smh))),Image.ANTIALIAS)
                     else:
