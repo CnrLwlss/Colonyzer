@@ -59,7 +59,6 @@ def parsePlateFormat(fmt):
         NoSpots=int(fmt)
     else:
         NoSpots=fmt
-        
     if NoSpots==384:
         nocols,norows = 24,16
     elif NoSpots==1536:
@@ -1296,6 +1295,7 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
         for b in im["Barcode"].unique():
             allBarcs.append(b)
     wset,hset,alst=set(),set(),set()
+    print("Scanning through images for sizes and aspect ratios")
     for barc in allBarcs:
         impath=clim[barc]
         imroot=os.path.basename(impath).split(".")[0]
