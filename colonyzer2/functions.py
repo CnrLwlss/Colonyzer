@@ -1294,16 +1294,17 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
     for im in imList:
         for b in im["Barcode"].unique():
             allBarcs.append(b)
-    wset,hset,alst=set(),set(),set()
+    wset,hset,aset=set(),set(),set()
     print("Scanning through images for sizes and aspect ratios")
-    for barc in allBarcs:
-        impath=clim[barc]
-        imroot=os.path.basename(impath).split(".")[0]
-        w,h=Image.open(impath).size
-        wlst.add(w)
-        hlst.add(h)
-        plst.add(float(w)/float(h))
-    (imw,imh)=(max(wlst),max(hlst))
+    for climind,clim in enumerate(closestImage):
+      for barc in allBarcs:
+          impath=clim[barc]
+          imroot=os.path.basename(impath).split(".")[0]
+          w,h=Image.open(impath).size
+          wset.add(w)
+          hset.add(h)
+          aset.add(float(w)/float(h))
+    (imw,imh)=(max(wset),max(hset))
 
     smh=int(round(float(imh)*float(smw)/float(imw)))
 
@@ -1374,7 +1375,7 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
                     # Scale factors for coordinates of preview images
                     scalex=(float(smw)/float(imw))
                     scaley=(float(smh)/float(imh))
-                    im.resize((int(round(scl*smw)),int(round(scl*smh))),Image.ANTIALIAS)
+                    im=im.resize((int(round(scl*smw)),int(round(scl*smh))),Image.ANTIALIAS)
                     if(os.path.exists(pospath)):
                         posim=Image.open(pospath).resize((int(round(scl*smw)),int(round(scl*smh))),Image.ANTIALIAS)
                     else:
@@ -1383,7 +1384,7 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
                         posim=im
                     plateArr[climind].paste(im,(int(round(col*smw*scl)),int(round(row*smh*scl))))
                     platePosArr[climind].paste(posim,(int(round(col*smw*scl)),int(round(row*smh*scl))))
-                dat=res[res["Barcode"]==barc]
+                dat=res[(res["Barcode"]==barc)&(res["Timeseries.order"]==1)]
                 dat["tlx"]=col*smw+scalex*dat["XOffset"]
                 dat["tly"]=row*smh+scaley*dat["YOffset"]
                 dat["brx"]=dat["tlx"]+scalex*dat["TileX"]
