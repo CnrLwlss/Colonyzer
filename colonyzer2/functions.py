@@ -1384,7 +1384,8 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
                         posim=im
                     plateArr[climind].paste(im,(int(round(col*smw*scl)),int(round(row*smh*scl))))
                     platePosArr[climind].paste(posim,(int(round(col*smw*scl)),int(round(row*smh*scl))))
-                dat=res[(res["Barcode"]==barc)&(res["Timeseries.order"]==1)]
+                #dat=res[(res["Barcode"]==barc)&(res["Timeseries.order"]==1)]
+		dat=res[(res["Barcode"]==barc)]
                 dat["tlx"]=col*smw+scalex*dat["XOffset"]
                 dat["tly"]=row*smh+scaley*dat["YOffset"]
                 dat["brx"]=dat["tlx"]+scalex*dat["TileX"]
