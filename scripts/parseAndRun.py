@@ -288,15 +288,17 @@ def main(inp=""):
                 arr=arr+(average_back-meanPx)
                 #arr=np.maximum(0,arr)
                 threshadj=thresh+(average_back-meanPx)
+                aveB=average_back
             else:
                 threshadj=thresh
+                aveB=0
 
             if not edgemask:
                 mask=np.ones(arr.shape,dtype=np.bool)
                 mask[corrected_arrN<threshadj]=False
-
+                
             # Measure culture phenotypes
-            locations=c2.measureSizeAndColour(locationsN,arr,im,mask,average_back,BARCODE,FILENAME[0:-4])
+            locations=c2.measureSizeAndColour(locationsN,arr,im,mask,aveB,BARCODE,FILENAME[0:-4])
 
             # Write results to file
             locations.to_csv(os.path.join(os.path.dirname(FILENAME),"Output_Data",os.path.basename(FILENAME).split(".")[0]+".out"),"\t",index=False,engine='python')
