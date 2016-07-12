@@ -7,10 +7,12 @@ import os
 import time
 import numpy as np
 import itertools
+import cv2
 from matplotlib.backends.backend_pdf import PdfPages, FigureCanvasPdf
 from matplotlib import figure
 from PIL import Image,ImageDraw
 from scipy import ndimage
+from pkg_resources import resource_filename, Requirement
 
 def checkImages(fdir,fdict=None,barcRange=(0,-24),verbose=False):
     '''Discover barcodes in current working directory (or in fdir or in those specified in fdict) for which analysis has not started.'''
@@ -39,6 +41,7 @@ def parseArgs(inp=''):
     parser.add_argument("-q","--quiet", help="Suppress messages printed to screen during analysis?", action="store_true")
     parser.add_argument("-e","--endpoint", help="Only analyse final image in series.  Mostly for testing single image analysis.",action="store_true")
     parser.add_argument("-k","--edgemask", help="Use intensity gradient & morphology for image segmentation instead of thresholding.",action="store_true")
+    parser.add_argument("-g","--greenlab", help="Check for presence of GreenLab lids on plates.",action="store_true")
     
     parser.add_argument("-d","--dir", type=str, help="Directory in which to search for image files that have not been analysed (current directory by default).",default=".")
     parser.add_argument("-l","--logsdir", type=str, help="Directory in which to search for JSON files listing images for analyis (e.g. LOGS3, root of HTS filestore).  Only used when intending to specify images for analysis in .json file (see -u).",default=".")
@@ -89,16 +92,24 @@ def buildVars(inp=''):
         fdict=locateJSON(inp.usedict,os.path.realpath(inp.logsdir),verbose)
     if fdict is not None and not os.path.exists(fdict): print("WARNING! "+fdict+" does not exist...")
 
+    if inp.lc:
+        diffIms=True
+    else:
+        diffIms=False
+
+    if inp.lc and inp.cut:
+        cut=True
+    else:
+        cut=False
+
     if verbose:
         if inp.lc:
             print("Lighting correction turned on.")
         else:
             print("Lighting correction turned off.")
-        diffIms=False
         if inp.lc:
             if inp.diffims:
                 print("Correcting for lighting differences between subsequent images of same plate.")
-                diffIms=True
             else:
                 print("Any lighting differences between plates will be ignored.")
         if inp.plots:
@@ -110,11 +121,11 @@ def buildVars(inp=''):
         else:
             print("Searching for colony locations automatically.")
             print("Checking "+str(inp.updates)+" (quasi-random) candidate grid positions in first phase of grid location")
-        cut=False
+        if inp.greenlab:
+            print("Removing images identified as containing GreenLab lids.")
         if inp.lc:
             if inp.cut:
                 print("Cutting cell signal from first image to create pseudo-empty plate (for lighting correction).")
-                cut=True
             else:
                 print("Using first plate (without segmenting) as best estimate of pseudo-empty plate (for lighting correction).")
         if fixedThresh==-99 and not inp.edgemask:
@@ -125,7 +136,7 @@ def buildVars(inp=''):
             print("Images will be segemented by intensity gradient and morphology instead of by thresholding.")
         if fdict is not None and os.path.exists(fdict):
             print("Preparing to load barcodes from "+fdict+".")
-    res={'lc':inp.lc,'fixedThresh':fixedThresh,'plots':inp.plots,'initpos':inp.initpos,'fdict':fdict,'fdir':fdir,'nrow':nrow,'ncol':ncol,'cut':cut,'verbose':verbose,'diffims':diffIms,'updates':inp.updates,'endpoint':inp.endpoint,'edgemask':inp.edgemask}
+    res={'lc':inp.lc,'fixedThresh':fixedThresh,'plots':inp.plots,'initpos':inp.initpos,'fdict':fdict,'fdir':fdir,'nrow':nrow,'ncol':ncol,'cut':cut,'verbose':verbose,'diffims':diffIms,'updates':inp.updates,'endpoint':inp.endpoint,'edgemask':inp.edgemask,'greenlab':inp.greenlab}
     return(res)
 
 def locateJSON(scrID,dirHTS='.',verbose=False):
@@ -133,12 +144,12 @@ def locateJSON(scrID,dirHTS='.',verbose=False):
     fdict=os.path.join(dirHTS,exptType+"_EXPERIMENTS",scrID,"AUXILIARY",scrID+"_C2.json")
     return(fdict)
 
-def prepareTimecourse(barcdict,verbose=False):
+def prepareTimecourse(barcdict,verbose=False,chklid=lambda x:False):
     '''In timecourse mode, prepares "next" batch of images for analysis from dictionary of image names (unique image barcodes are dictionary keys).'''
     BARCs=sorted(barcdict)
     BARCODE=BARCs[0]
     imdir=os.path.dirname(barcdict[BARCODE][0])
-    IMs=barcdict[BARCODE]
+    IMs=[b for b in barcdict[BARCODE] if not chklid(b)]
     LATESTIMAGE=IMs[0]
     EARLIESTIMAGE=IMs[-1]
     imRoot=EARLIESTIMAGE.split(".")[0]
@@ -180,21 +191,38 @@ def edgeFill(arr,locations,dx,dy,cutoff=0.8):
     maskN=ndimage.morphology.binary_erosion(fillN,iterations=7)
     return(maskN)
 
+def edgeFill2(arr,cutoff=0.8):
+    edgeN=c2.getEdges(arr,cutoff=cutoff)
+    er1=ndimage.morphology.binary_erosion(edgeN,iterations=2)
+    di1=ndimage.morphology.binary_dilation(er1,iterations=4)
+    edgemap=np.logical_and(di1,edgeN)
+    fillN=ndimage.morphology.binary_fill_holes(edgemap)
+    return(fillN)
+
 def main(inp=""):
     print("Colonyzer "+c2.__version__)
-
-    cythonFill=False
-
+    
     var=buildVars(inp=inp)
-    correction,fixedThresh,plots,initpos,fdict,fdir,nrow,ncol,cut,verbose,diffIms,updates,endpoint,edgemask=(var["lc"],var["fixedThresh"],var["plots"],var["initpos"],var["fdict"],var["fdir"],var["nrow"],var["ncol"],var["cut"],var["verbose"],var["diffims"],var["updates"],var["endpoint"],var["edgemask"])
+    correction,fixedThresh,plots,initpos,fdict,fdir,nrow,ncol,cut,verbose,diffIms,updates,endpoint,edgemask,greenlab=(var["lc"],var["fixedThresh"],var["plots"],var["initpos"],var["fdict"],var["fdir"],var["nrow"],var["ncol"],var["cut"],var["verbose"],var["diffims"],var["updates"],var["endpoint"],var["edgemask"],var["greenlab"])
     barcdict=checkImages(fdir,fdict,verbose=verbose)
+    if greenlab:
+        barcdict={x:barcdict[x] for x in barcdict.keys() if not c2.checkAnalysisStarted(barcdict[x][-1])}
     rept=c2.setupDirectories(barcdict,verbose=verbose)
+
+    if greenlab:
+        posfiles=[resource_filename(Requirement.parse("colonyzer2"),os.path.join("data",f)) for f in ["GreenLabLid.png","CornerLid.png","BottomRightLid.png"]]
+        negfiles=[resource_filename(Requirement.parse("colonyzer2"),os.path.join("data",f)) for f in ["GreenLabNoLid.png","CornerNoLid.png","BottomRightNoLid.png"]]
+        frects=[[0.15,0.85,0.5,1.0],[0.0,0.8,0.125,1.0],[0.85,0.8,1.0,1.0]]
+        pdistThresh,ndistThresh=50.3,53.333
+        checkLid=c2.makeLidTest(posfiles,negfiles,frects,pdistThresh,ndistThresh,False)
+    else:
+        def checkLid(fname): False
 
     start=time.time()
 
     while len(barcdict)>0:
 
-        BARCODE,imdir,LATESTIMAGE,EARLIESTIMAGE,imRoot=prepareTimecourse(barcdict,verbose=verbose)  
+        BARCODE,imdir,LATESTIMAGE,EARLIESTIMAGE,imRoot=prepareTimecourse(barcdict,verbose=verbose,chklid=checkLid)  
 
         if plots:
             pdf=PdfPages(os.path.join(os.path.dirname(EARLIESTIMAGE),"Output_Reports",os.path.basename(EARLIESTIMAGE).split(".")[0]+".pdf"))
@@ -229,44 +257,27 @@ def main(inp=""):
         # Update guesses and initialise locations data frame
         locationsN=c2.locateCultures([int(round(cx-dx/2.0)) for cx in candx],[int(round(cy-dy/2.0)) for cy in candy],dx,dy,arrloc,ncol,nrow,update=True)
 
-        mask=edgeFill(arr0,locationsN,dx,dy,0.8)
+        mask=edgeFill2(arrN,0.9)
+        c2.showIm(mask)
+        grd=mask.copy()
+        grd[:,:]=False
+        grd[min(locationsN.y-dy/2):max(locationsN.y+dy/2),min(locationsN.x-dx/2):max(locationsN.x+dx/2)]=True
+        spots=np.logical_and(grd,mask)
+        agar=np.logical_and(grd,~mask)
+        ave0=np.mean(arr0[agar])
+        thresh=-99
+        
         if correction:
             if cut:
-                startFill=time.time()
-                if cythonFill:
-                    pseudoempty=c2.maskAndFillCython(arr0,maskN,0.005)
-                    print("Inpainting using Cython & np: "+str(time.time()-startFill)+" s")
-                else:
-                    pseudoempty=c2.maskAndFill(arr0,mask,0.005)
-                    print("Inpainting using np: "+str(time.time()-start)+" s")
+                pseudoempty = np.array(np.round(arr0.copy()),dtype=np.uint8)
+                bytemask = np.asarray(spots*255, dtype=np.uint8)
+                filled = cv2.inpaint(pseudoempty,bytemask,3,cv2.INPAINT_NS)
+                blurred = cv2.GaussianBlur(filled,(21,21),0)
+                pseudoempty[spots] = blurred[spots]
             else:
                 pseudoempty=arr0
-                
-            # Smooth (pseudo-)empty image 
-            (correction_map,average_back)=c2.makeCorrectionMap(pseudoempty,locationsN,verbose=verbose)
-                
-            # Correct spatial gradient in final image
-            corrected_arrN=arrN*correction_map
         else:
-            average_back=np.mean(arr0[np.min(locationsN.y):np.max(locationsN.y),np.min(locationsN.x):np.max(locationsN.x)])
-            corrected_arrN=arrN
-
-        # Trim outer part of image to remove plate walls
-        trimmed_arrN=corrected_arrN[max(0,int(round(min(locationsN.y)-dy/2.0))):min(arrN.shape[0],int(round((max(locationsN.y)+dy/2.0)))),max(0,int(round(min(locationsN.x)-dx/2.0))):min(arrN.shape[1],int(round((max(locationsN.x)+dx/2.0))))]
-
-        if edgemask:
-            thresh=-99
-        else:
-            if fixedThresh>=0:
-                thresh=fixedThresh
-            else:
-                (thresh,bindat)=c2.automaticThreshold(trimmed_arrN,BARCODE,pdf=pdf)
-                if plots:
-                    c2.plotModel(bindat,label=BARCODE,pdf=pdf)
-
-        # Mask for identifying culture areas
-        maskN=np.ones(arrN.shape,dtype=np.bool)
-        maskN[corrected_arrN<thresh]=False
+            pseudoempty=0
 
         for FILENAME in barcdict[BARCODE]:
 
@@ -275,40 +286,23 @@ def main(inp=""):
             im,arr=c2.openImage(FILENAME)
             # Local updates on individual images to allow for slight movement of plate
             #locationsN=c2.locateCultures([int(round(cx-dx/2.0)) for cx in candx],[int(round(cy-dy/2.0)) for cy in candy],dx,dy,arr,ncol,nrow,update=True)
+
+            ave=np.mean(arr[agar])
+            # Correct for minor lighting differences between images
+            arr=np.maximum(0,np.minimum(255,arr-(ave-ave0)))
+            # Subtract background (corrects for lighting differences within plate/image as well as making agar intensity correspond to zero signal)
+            arr=np.maximum(arr-pseudoempty,0)
             
-            if correction:
-                arr=arr*correction_map
-
-            if diffIms:
-                # Correct for lighting differences between plates
-                arrsm=arr[max(0,int(round(min(locationsN.y)-dy/2.0))):min(arrN.shape[0],int(round((max(locationsN.y)+dy/2.0)))),max(0,int(round(min(locationsN.x)-dx/2.0))):min(arrN.shape[1],int(round((max(locationsN.x)+dx/2.0))))]
-                masksm=maskN[max(0,int(round(min(locationsN.y)-dy/2.0))):min(arrN.shape[0],int(round((max(locationsN.y)+dy/2.0)))),max(0,int(round(min(locationsN.x)-dx/2.0))):min(arrN.shape[1],int(round((max(locationsN.x)+dx/2.0))))]
-                meanPx=np.mean(arrsm[np.logical_not(masksm)])
-
-                arr=arr+(average_back-meanPx)
-                #arr=np.maximum(0,arr)
-                threshadj=thresh+(average_back-meanPx)
-                aveB=average_back
-            else:
-                threshadj=thresh
-                aveB=0
-
-            if not edgemask:
-                mask=np.ones(arr.shape,dtype=np.bool)
-                mask[corrected_arrN<threshadj]=False
-                
             # Measure culture phenotypes
-            locations=c2.measureSizeAndColour(locationsN,arr,im,mask,average_back,BARCODE,FILENAME[0:-4])
+            locations=c2.measureSizeAndColour(locationsN,arr,im,spots,0,BARCODE,FILENAME[0:-4])
 
             # Write results to file
             locations.to_csv(os.path.join(os.path.dirname(FILENAME),"Output_Data",os.path.basename(FILENAME).split(".")[0]+".out"),"\t",index=False,engine='python')
-            dataf=c2.saveColonyzer(os.path.join(os.path.dirname(FILENAME),"Output_Data",os.path.basename(FILENAME).split(".")[0]+".dat"),locations,threshadj,dx,dy)
+            dataf=c2.saveColonyzer(os.path.join(os.path.dirname(FILENAME),"Output_Data",os.path.basename(FILENAME).split(".")[0]+".dat"),locations,thresh,dx,dy)
 
             # Visual check of culture locations
-            if edgemask:
-                imthresh=c2.threshPreview(locations,mask,None)
-            else:
-                imthresh=c2.threshPreview(locations,arr,threshadj)
+            imthresh=c2.threshPreview(locations,mask,None)
+
             r=5
             draw=ImageDraw.Draw(imthresh)
             draw.ellipse((com[1]-r,com[0]-r,com[1]+r,com[0]+r),fill=(255,0,0))

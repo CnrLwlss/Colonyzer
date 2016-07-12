@@ -714,6 +714,8 @@ def sizeSpots(locations,arr,thresharr,edge,background=0):
         bkgrnd=tile[np.logical_not(threshtile)]
         if bkgrnd.size>1:
             backgroundMedian=np.median(bkgrnd/intMax)
+        else:
+            backgroundMedian=0
         sumInt.append(max(0,float(np.sum(tile))/(float(tile.size)*intMax)))
         sumArea.append(max(0,float(area)/float(tile.size)))
         trim.append(max(0,allTrim))
