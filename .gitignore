@@ -3,7 +3,6 @@ Output_Data/
 *.bak
 *.pyc
 *.pdf
-*.png
 dist/
 Auxiliary/Data/endpoints/384/Output_Images/
 Auxiliary/Data/endpoints/384/Output_Data/
