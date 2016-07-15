@@ -31,7 +31,7 @@ def git_version():
 
     return GIT_REVISION
 
-version='1.1.13'
+version='1.1.14'
 VERSION=version+"."+git_version()
 f=open('colonyzer2/version.py',"w")
 f.write("__version__='{}'".format(VERSION))
@@ -53,7 +53,7 @@ setup(name='Colonyzer2',
       packages=['colonyzer2','scripts'],
       description='Image analysis for microbial cultures growing on solid agar surfaces',
       long_description=open('README.txt').read(),
-      entry_points={"console_scripts":["colonyzer = scripts.parseAndRun2:main",
+      entry_points={"console_scripts":["colonyzer = scripts.parseAndRun3:main",
                                        "parametryzer = scripts.parameteryzer_script:main",
                                        "merge = scripts.findAndMerge:main"]},
       author='Conor Lawless',
