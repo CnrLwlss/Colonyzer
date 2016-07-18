@@ -9,7 +9,7 @@ import matplotlib
 
 def getMatches(fname,featlist,frects,orb,draw=False):
     '''Match list of ORB-detected features (featlist) against cropped sections (cropped according to frects) of image file (fname)'''
-    if type(fname) in (str, np.string_):
+    if type(fname) in (str, unicode, np.string_):
         fullplate = cv2.imread(fname,0) # trainImage
     else: # assume PIL image object
         fname.load()
