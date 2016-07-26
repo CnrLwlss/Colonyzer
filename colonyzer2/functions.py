@@ -867,12 +867,14 @@ Return a dictionary of filenames, listed by barcode (plate ID)'''
     barcdict={}
     for filename in allfiles:
         fname=os.path.basename(filename)
+        fbase=fname.split(".")[0]
         barc=fname[barcRange[0]:barcRange[1]]
-        if barc not in barcsDone:
-            if barc not in barcdict:
-                barcdict[barc]=[filename]
-            else:
-                barcdict[barc].append(filename)
+        if fbase in imsDone:
+            if barc not in barcsDone:
+                if barc not in barcdict:
+                    barcdict[barc]=[filename]
+                else:
+                    barcdict[barc].append(filename)
     for b in barcdict:
         fnames=np.array([os.path.basename(x) for x in barcdict[b]])
         barcdict[b]=list(np.array(barcdict[b])[fnames.argsort()])[::-1]
