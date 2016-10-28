@@ -849,7 +849,7 @@ def checkAnalysisStarted(imname):
 
 def getBarcodes(fullpath,barcRange=(0,15),checkDone=True,verbose=False):
     '''Get filenames for all images in current directory and all sub-directories.
-Return a dictionary of filenames, listed by barcode (plate ID)'''
+    Return a dictionary of filenames, listed by barcode (plate ID)'''
     allfiles=[]
     alldats=[]
     for dirname, dirnames, filenames in os.walk(fullpath):
@@ -869,7 +869,7 @@ Return a dictionary of filenames, listed by barcode (plate ID)'''
         fname=os.path.basename(filename)
         fbase=fname.split(".")[0]
         barc=fname[barcRange[0]:barcRange[1]]
-        if fbase in imsDone:
+        if fbase not in imsDone:
             if barc not in barcsDone:
                 if barc not in barcdict:
                     barcdict[barc]=[filename]
