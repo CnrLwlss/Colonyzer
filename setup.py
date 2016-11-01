@@ -31,7 +31,7 @@ def git_version():
 
     return GIT_REVISION
 
-version='1.1.16'
+version='1.1.18'
 VERSION=version+"."+git_version()
 f=open('colonyzer2/version.py',"w")
 f.write("__version__='{}'".format(VERSION))
