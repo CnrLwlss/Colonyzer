@@ -1322,7 +1322,7 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
     # Prepare blank slates for large preview images
     plateArr=[Image.new('RGB',(int(round(scl*smw*W)),int(round(scl*smh*H))),color=0) for x in range(len(closestImage))]
     platePosArr=[Image.new('RGB',(int(round(scl*smw*W)),int(round(scl*smh*H))),color=0) for x in range(len(closestImage))]
-    plateOver=Image.new('RGBA',(int(round(scl*smw*W)),int(round(scl*smh*H))),color=0)
+    plateOver=Image.new('RGBA',(int(round(scl*smw*W)),int(round(scl*smh*H))),(0,0,0,0))
 
     if (len(htmlroot)==len(closestImage)):
         imnames=[h+'.jpeg' for h in htmlroot]
@@ -1332,7 +1332,7 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
         posimnames=[htmlroot+'_%04dPOS.jpeg'%i for i in range(len(closestImage))]
     htmlname="index.html"
     nomapname="nomap.html"
-    overlayname='OVERLAY.gif'
+    overlayname='OVERLAY.png'
         
     draw = ImageDraw.Draw(plateOver)
 
@@ -1389,7 +1389,7 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
                     plateArr[climind].paste(im,(int(round(col*smw*scl)),int(round(row*smh*scl))))
                     platePosArr[climind].paste(posim,(int(round(col*smw*scl)),int(round(row*smh*scl))))
                 #dat=res[(res["Barcode"]==barc)&(res["Timeseries.order"]==1)]
-		dat=res[(res["Barcode"]==barc)]
+                dat=res[(res["Barcode"]==barc)]
                 dat["tlx"]=col*smw+scalex*dat["XOffset"]
                 dat["tly"]=row*smh+scaley*dat["YOffset"]
                 dat["brx"]=dat["tlx"]+scalex*dat["TileX"]
@@ -1431,7 +1431,7 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
     for i in range(len(closestImage)):
         plateArr[i].save(os.path.join(outPath,imnames[i]),quality=100)
         platePosArr[i].save(os.path.join(outPath,posimnames[i]),quality=100)
-    plateOver.save(os.path.join(outPath,overlayname),transparency=0)
+    plateOver.save(os.path.join(outPath,overlayname))
     fout=open(os.path.join(outPath,htmlname),'w')
     fout.write(SGAString+KeyString+'<map name="ImageMap">'+mapString+plateString+"</map></body></html>")
     fout.close()
