@@ -795,7 +795,7 @@ def saveColonyzer(filename,locs,thresh,dx,dy):
     colorder=("FILENAME","ROW","COLUMN","TOPLEFTX","TOPLEFTY","WHITEAREA","TRIMMED","THRESHOLD","INTENSITY","EDGEPIXELS","COLR","COLG","COLB","BKR","BKG","BKB","EDGELEN","XDIM","YDIM")
     dataf=pd.DataFrame(df)
     dataf.reindex_axis(colorder, axis=1)
-    dataf.to_csv(filename,"\t",index=False,header=False,columns=colorder,engine='python')
+    dataf.to_csv(filename,"\t",index=False,header=False,columns=colorder)
     return(dataf)
 
 def setupDirectories(dictlist,verbose=True):
