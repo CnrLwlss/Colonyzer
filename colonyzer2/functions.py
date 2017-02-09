@@ -1,3 +1,5 @@
+import matplotlib
+matplotlib.use('Agg')
 import PIL,math,os,sys,time,platform
 import numpy as np
 import pandas as pd
@@ -12,6 +14,7 @@ import scipy.optimize as op
 import itertools
 import sobol
 import json
+
 
 def is_number(s):
     try:
