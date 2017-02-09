@@ -698,9 +698,9 @@ def sizeSpots(locations,arr,thresharr,edge,background=0):
     sumInt,sumArea,trim,fMed,bMed,circ,fVar,perim=[],[],[],[],[],[],[],[]
     for i in range(0,len(locations.x.values)):
         x,y,rad=locations.x.values[i],locations.y.values[i],int(math.ceil(max(locations.Diameter.values)/2.0))
-        tile=arr[max(0,y-rad):min(arr.shape[0],(y+rad+1)),max(0,x-rad):min(arr.shape[1],(x+rad+1))]-background
-        threshtile=thresharr[max(0,y-rad):min(arr.shape[0],(y+rad+1)),max(0,x-rad):min(arr.shape[1],(x+rad+1))]
-        edgetile=edge[max(0,y-rad):min(arr.shape[0],(y+rad+1)),max(0,x-rad):min(arr.shape[1],(x+rad+1))]
+        tile=arr[int(round(max(0,y-rad))):int(round(min(arr.shape[0],(y+rad+1)))),int(round(max(0,x-rad))):int(round(min(arr.shape[1],(x+rad+1))))]-background
+        threshtile=thresharr[int(round(max(0,y-rad))):int(round(min(arr.shape[0],(y+rad+1)))),int(round(max(0,x-rad))):int(round(min(arr.shape[1],(x+rad+1))))]
+        edgetile=edge[int(round(max(0,y-rad))):int(round(min(arr.shape[0],(y+rad+1)))),int(round(max(0,x-rad))):int(round(min(arr.shape[1],(x+rad+1))))]
         perimeter=np.sum(edgetile)
         area=np.sum(threshtile)
         if perimeter>0:
@@ -745,10 +745,11 @@ def getColours(im,locations,thresharr):
     store=np.zeros((len(locations.x.values),12),np.float)
     for i in range(0,len(locations.x.values)):
         x,y,rad=locations.x.values[i],locations.y.values[i],int(math.ceil(max(locations.Diameter.values)/2.0))
-        redtile=redarr[y-rad:(y+rad+1),x-rad:(x+rad+1)]
-        greentile=greenarr[y-rad:(y+rad+1),x-rad:(x+rad+1)]
-        bluetile=bluearr[y-rad:(y+rad+1),x-rad:(x+rad+1)]
-        threshtile=thresharr[y-rad:(y+rad+1),x-rad:(x+rad+1)]
+        xpx,ypx=np.arange(round(x-rad),round(x+rad+1)).astype(int),np.arange(round(y-rad),round(y+rad+1)).astype(int)
+        redtile=redarr[ypx,xpx]
+        greentile=greenarr[ypx,xpx]
+        bluetile=bluearr[ypx,xpx]
+        threshtile=thresharr[ypx,xpx]
         rMean,gMean,bMean=np.mean(redtile[threshtile]),np.mean(greentile[threshtile]),np.mean(bluetile[threshtile])
         rMed,gMed,bMed=np.median(redtile[threshtile]),np.median(greentile[threshtile]),np.median(bluetile[threshtile])
         rMeanBk,gMeanBk,bMeanBk=np.mean(redtile[np.logical_not(threshtile)]),np.mean(greentile[np.logical_not(threshtile)]),np.mean(bluetile[np.logical_not(threshtile)])
