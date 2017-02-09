@@ -20,6 +20,13 @@
 #### Submitting updates to [Colonyzer2 PYPI pages](https://pypi.python.org/pypi?%3Aaction=pkg_edit&name=Colonyzer2)
 
 First, increment the version number in [setup.py](setup.py).
+
+If you have not already registered a username with [PYPI](https://pypi.python.org/pypi) you should do that.  Then authenticate yourself:
+
+```shell
+python setup.py register
+```
+
 Then, navigate to the directory containing [setup.py](setup.py) and upload the updated package at the command-line as follows:
 ```shell
 python setup.py sdist upload
