@@ -31,7 +31,7 @@ def git_version():
 
     return GIT_REVISION
 
-version='1.1.15'
+version='1.1.20'
 VERSION=version+"."+git_version()
 f=open('colonyzer2/version.py',"w")
 f.write("__version__='{}'".format(VERSION))
@@ -66,5 +66,5 @@ setup(name='Colonyzer2',
         ],
       ext_modules=ext_modules,
       include_dirs=[numpy.get_include()],
-      data_files=[('data',["data/BottomRightLid.png","data/BottomRightNoLid.png","data/CornerLid.png","data/CornerNoLid.png","data/GreenLabLid.png","data/GreenLabNoLid.png"])]
+      data_files=[('data',["./data/BottomRightLid.png","./data/BottomRightNoLid.png","./data/CornerLid.png","./data/CornerNoLid.png","./data/GreenLabLid.png","./data/GreenLabNoLid.png"])]
       )

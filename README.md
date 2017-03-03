@@ -5,8 +5,6 @@
 
 ![Yeast growing on agar surface](http://farm6.staticflickr.com/5310/5658435523_c2e43729f1_b.jpg "Yeast on agar")
 
-Colonyzer is currently undergoing major redevelopment
-
 #### Recent updates:
 
 * Python 3 compatible - installation via pip more straightforward
@@ -18,6 +16,21 @@ Colonyzer is currently undergoing major redevelopment
 * Alternative segmentation algorithm - detects cells by first detecting culture edges and infilling: even higher sensitivity at very low signal levels
 * Improved lighting correction - generate pseudo-empty plate by infilling segmented pixels using a Gaussian Random Markov Field update
 * Test datasets - [suite](Auxiliary/Data) of problematic images for checking performance of scripts and algorithms
+
+#### Submitting updates to [Colonyzer2 PYPI pages](https://pypi.python.org/pypi?%3Aaction=pkg_edit&name=Colonyzer2)
+
+First, increment the version number in [setup.py](setup.py).
+
+If you have not already registered a username with [PYPI](https://pypi.python.org/pypi) you should do that.  Then authenticate yourself:
+
+```shell
+python setup.py register
+```
+
+Then, navigate to the directory containing [setup.py](setup.py) and upload the updated package at the command-line as follows:
+```shell
+python setup.py sdist upload
+````
 
 Website describing current, stable release:
 http://research.ncl.ac.uk/colonyzer/

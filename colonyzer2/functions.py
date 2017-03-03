@@ -1,3 +1,5 @@
+import matplotlib
+matplotlib.use('Agg')
 import PIL,math,os,sys,time,platform
 import numpy as np
 import pandas as pd
@@ -12,6 +14,7 @@ import scipy.optimize as op
 import itertools
 import sobol
 import json
+
 
 def is_number(s):
     try:
@@ -695,9 +698,9 @@ def sizeSpots(locations,arr,thresharr,edge,background=0):
     sumInt,sumArea,trim,fMed,bMed,circ,fVar,perim=[],[],[],[],[],[],[],[]
     for i in range(0,len(locations.x.values)):
         x,y,rad=locations.x.values[i],locations.y.values[i],int(math.ceil(max(locations.Diameter.values)/2.0))
-        tile=arr[max(0,y-rad):min(arr.shape[0],(y+rad+1)),max(0,x-rad):min(arr.shape[1],(x+rad+1))]-background
-        threshtile=thresharr[max(0,y-rad):min(arr.shape[0],(y+rad+1)),max(0,x-rad):min(arr.shape[1],(x+rad+1))]
-        edgetile=edge[max(0,y-rad):min(arr.shape[0],(y+rad+1)),max(0,x-rad):min(arr.shape[1],(x+rad+1))]
+        tile=arr[int(round(max(0,y-rad))):int(round(min(arr.shape[0],(y+rad+1)))),int(round(max(0,x-rad))):int(round(min(arr.shape[1],(x+rad+1))))]-background
+        threshtile=thresharr[int(round(max(0,y-rad))):int(round(min(arr.shape[0],(y+rad+1)))),int(round(max(0,x-rad))):int(round(min(arr.shape[1],(x+rad+1))))]
+        edgetile=edge[int(round(max(0,y-rad))):int(round(min(arr.shape[0],(y+rad+1)))),int(round(max(0,x-rad))):int(round(min(arr.shape[1],(x+rad+1))))]
         perimeter=np.sum(edgetile)
         area=np.sum(threshtile)
         if perimeter>0:
@@ -742,10 +745,11 @@ def getColours(im,locations,thresharr):
     store=np.zeros((len(locations.x.values),12),np.float)
     for i in range(0,len(locations.x.values)):
         x,y,rad=locations.x.values[i],locations.y.values[i],int(math.ceil(max(locations.Diameter.values)/2.0))
-        redtile=redarr[y-rad:(y+rad+1),x-rad:(x+rad+1)]
-        greentile=greenarr[y-rad:(y+rad+1),x-rad:(x+rad+1)]
-        bluetile=bluearr[y-rad:(y+rad+1),x-rad:(x+rad+1)]
-        threshtile=thresharr[y-rad:(y+rad+1),x-rad:(x+rad+1)]
+        xpx,ypx=np.arange(round(x-rad),round(x+rad+1)).astype(int),np.arange(round(y-rad),round(y+rad+1)).astype(int)
+        redtile=redarr[ypx,xpx]
+        greentile=greenarr[ypx,xpx]
+        bluetile=bluearr[ypx,xpx]
+        threshtile=thresharr[ypx,xpx]
         rMean,gMean,bMean=np.mean(redtile[threshtile]),np.mean(greentile[threshtile]),np.mean(bluetile[threshtile])
         rMed,gMed,bMed=np.median(redtile[threshtile]),np.median(greentile[threshtile]),np.median(bluetile[threshtile])
         rMeanBk,gMeanBk,bMeanBk=np.mean(redtile[np.logical_not(threshtile)]),np.mean(greentile[np.logical_not(threshtile)]),np.mean(bluetile[np.logical_not(threshtile)])
@@ -791,7 +795,7 @@ def saveColonyzer(filename,locs,thresh,dx,dy):
     colorder=("FILENAME","ROW","COLUMN","TOPLEFTX","TOPLEFTY","WHITEAREA","TRIMMED","THRESHOLD","INTENSITY","EDGEPIXELS","COLR","COLG","COLB","BKR","BKG","BKB","EDGELEN","XDIM","YDIM")
     dataf=pd.DataFrame(df)
     dataf.reindex_axis(colorder, axis=1)
-    dataf.to_csv(filename,"\t",index=False,header=False,columns=colorder,engine='python')
+    dataf.to_csv(filename,"\t",index=False,header=False,columns=colorder)
     return(dataf)
 
 def setupDirectories(dictlist,verbose=True):
@@ -1322,7 +1326,7 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
     # Prepare blank slates for large preview images
     plateArr=[Image.new('RGB',(int(round(scl*smw*W)),int(round(scl*smh*H))),color=0) for x in range(len(closestImage))]
     platePosArr=[Image.new('RGB',(int(round(scl*smw*W)),int(round(scl*smh*H))),color=0) for x in range(len(closestImage))]
-    plateOver=Image.new('RGBA',(int(round(scl*smw*W)),int(round(scl*smh*H))),color=0)
+    plateOver=Image.new('RGBA',(int(round(scl*smw*W)),int(round(scl*smh*H))),(0,0,0,0))
 
     if (len(htmlroot)==len(closestImage)):
         imnames=[h+'.jpeg' for h in htmlroot]
@@ -1332,7 +1336,7 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
         posimnames=[htmlroot+'_%04dPOS.jpeg'%i for i in range(len(closestImage))]
     htmlname="index.html"
     nomapname="nomap.html"
-    overlayname='OVERLAY.gif'
+    overlayname='OVERLAY.png'
         
     draw = ImageDraw.Draw(plateOver)
 
@@ -1389,7 +1393,7 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
                     plateArr[climind].paste(im,(int(round(col*smw*scl)),int(round(row*smh*scl))))
                     platePosArr[climind].paste(posim,(int(round(col*smw*scl)),int(round(row*smh*scl))))
                 #dat=res[(res["Barcode"]==barc)&(res["Timeseries.order"]==1)]
-		dat=res[(res["Barcode"]==barc)]
+                dat=res[(res["Barcode"]==barc)]
                 dat["tlx"]=col*smw+scalex*dat["XOffset"]
                 dat["tly"]=row*smh+scaley*dat["YOffset"]
                 dat["brx"]=dat["tlx"]+scalex*dat["TileX"]
@@ -1431,7 +1435,7 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
     for i in range(len(closestImage)):
         plateArr[i].save(os.path.join(outPath,imnames[i]),quality=100)
         platePosArr[i].save(os.path.join(outPath,posimnames[i]),quality=100)
-    plateOver.save(os.path.join(outPath,overlayname),transparency=0)
+    plateOver.save(os.path.join(outPath,overlayname))
     fout=open(os.path.join(outPath,htmlname),'w')
     fout.write(SGAString+KeyString+'<map name="ImageMap">'+mapString+plateString+"</map></body></html>")
     fout.close()

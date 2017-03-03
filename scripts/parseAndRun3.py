@@ -254,7 +254,7 @@ def main(inp=""):
             mask=edgeFill2(arrN,0.9)
             grd=mask.copy()
             grd[:,:]=False
-            grd[min(locationsN.y-dy/2):max(locationsN.y+dy/2),min(locationsN.x-dx/2):max(locationsN.x+dx/2)]=True
+            grd[int(round(min(locationsN.y-dy/2))):int(round(max(locationsN.y+dy/2))),int(round(min(locationsN.x-dx/2))):int(round(max(locationsN.x+dx/2)))]=True
             spots=np.logical_and(grd,mask)
             agar=np.logical_and(grd,~mask)
             ave0=np.mean(arr0[agar])
@@ -290,7 +290,7 @@ def main(inp=""):
                 locations=c2.measureSizeAndColour(locationsN,arr,im,spots,0,BARCODE,FILENAME[0:-4])
 
                 # Write results to file
-                locations.to_csv(os.path.join(os.path.dirname(FILENAME),"Output_Data",os.path.basename(FILENAME).split(".")[0]+".out"),"\t",index=False,engine='python')
+                locations.to_csv(os.path.join(os.path.dirname(FILENAME),"Output_Data",os.path.basename(FILENAME).split(".")[0]+".out"),"\t",index=False)
                 dataf=c2.saveColonyzer(os.path.join(os.path.dirname(FILENAME),"Output_Data",os.path.basename(FILENAME).split(".")[0]+".dat"),locations,thresh,dx,dy)
 
                 # Visual check of culture locations
