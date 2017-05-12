@@ -863,22 +863,22 @@ def getBarcodes(fullpath,barcRange=(0,15),checkDone=True,verbose=False):
                     allfiles.append(os.path.join(dirname, filename))
                 elif filename[-4:] == '.out':
                     alldats.append(os.path.join(dirname, filename))
-    imsDone=list(np.unique([os.path.basename(dat).split(".")[0] for dat in alldats]))
     if checkDone:
+        imsDone=list(np.unique([os.path.basename(dat).split(".")[0] for dat in alldats]))
         barcsDone=list(np.unique([os.path.basename(dat)[barcRange[0]:barcRange[1]] for dat in alldats]))
     else:
         barcsDone=[]
+        imsDone=[]
     barcdict={}
     for filename in allfiles:
         fname=os.path.basename(filename)
         fbase=fname.split(".")[0]
         barc=fname[barcRange[0]:barcRange[1]]
-        if fbase not in imsDone:
-            if barc not in barcsDone:
-                if barc not in barcdict:
-                    barcdict[barc]=[filename]
-                else:
-                    barcdict[barc].append(filename)
+        if (fbase not in imsDone) or (barc not in barcsDone):
+            if barc not in barcdict:
+                barcdict[barc]=[filename]
+            else:
+                barcdict[barc].append(filename)
     for b in barcdict:
         fnames=np.array([os.path.basename(x) for x in barcdict[b]])
         barcdict[b]=list(np.array(barcdict[b])[fnames.argsort()])[::-1]
