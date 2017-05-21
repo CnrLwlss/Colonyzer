@@ -128,11 +128,11 @@ for JPG in JPGs:
                     shutil.copyfile(pname,ptarg)
                     toDelete.append(JPG)
                 else:
-                    print JPG, "Missing files."
+                    print(JPG, "Missing files.")
             else:
-                print JPG, " too recent"
+                print(JPG, " too recent")
     except:
-        print JPG, " failed"
+        print(JPG, " failed")
 
 # If that's been successful, let's delete the remaining files
 for JPG in toDelete:

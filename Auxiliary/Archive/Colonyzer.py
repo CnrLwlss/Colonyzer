@@ -59,7 +59,7 @@ def SetUp(instructarr):
         nocols,norows = int(tmp[0]),int(tmp[1])
     else:
         nocols,norows=0,0
-        print "WARNING: Incorrect spot number specified!"
+        print("WARNING: Incorrect spot number specified!")
     tlx,tly=TLX,TLY
     brx,bry=BRX,BRY
 
@@ -75,7 +75,7 @@ def SetUp(instructarr):
 
     # Parameter for specifying the search area (area is (NSearch*2+1)^2)
     NSearch = int(round(3.0*float(min(xdim,ydim))/8.0))
-    print "Instructions: ",xstart,ystart,xdim,ydim,NSearch
+    print("Instructions: ",xstart,ystart,xdim,ydim,NSearch)
 
 # Let's find what directory we're in
 syspath = os.path.dirname(sys.argv[0])
@@ -86,7 +86,7 @@ Instructions=open(os.path.join(fullpath,'Colonyzer.txt'),'r')
 InsData={}
 InsTemp=Instructions.readlines()
 
-for x in xrange(0,len(InsTemp)):
+for x in range(0,len(InsTemp)):
     if InsTemp[x][0]!="#" and InsTemp[x][0]!="\n":
         tlist=InsTemp[x].split(',')
         if len(tlist)>1:
@@ -95,7 +95,7 @@ for x in xrange(0,len(InsTemp)):
 if 'default' in InsData:
     SetUp(InsData['default'])
 else:
-    print "ERROR: No default instructions"
+    print("ERROR: No default instructions")
     sys.exit()
 
 # If you call the script via :
@@ -136,7 +136,7 @@ if graphicsout:
     outputimages=fullpath
 else:
     # Print where python thinks it lives 
-    print "Working Directory: ",os.getcwd()
+    print("Working Directory: ",os.getcwd())
     outputimages=os.path.join(fullpath,"Output_Images")
 outputdata=os.path.join(fullpath,"Output_Data")
 
@@ -169,11 +169,11 @@ def smooth(x,window_len=10,window='hanning'):
     #    raise ValueError, "smooth only accepts 1 dimension arrays."
 
     if x.size < window_len:
-        raise ValueError, "Input vector needs to be bigger than window size."
+        raise ValueError("Input vector needs to be bigger than window size.")
     if window_len<3:
         return x
     if not window in ['flat', 'hanning', 'hamming', 'bartlett', 'blackman']:
-        raise ValueError, "Window is on of 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'"
+        raise ValueError("Window is on of 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'")
     s=numpy.r_[2*x[0]-x[window_len:1:-1],x,2*x[-1]-x[-1:-window_len:-1]]
     #print(len(s))
     if window == 'flat': #moving average
@@ -191,7 +191,7 @@ def getMin(list):
     # For Python 2.3 (on cisbclust) we will have to do this manually
     minplace=len(list)+1
     minimum=min(list)
-    for element in xrange(len(list)):
+    for element in range(len(list)):
         if list[element]==minimum:
             minplace=element
             return minplace
@@ -204,7 +204,7 @@ def getMax(list):
     # For Python 2.3 (on cisbclust) we will have to do this manually
     maxplace=len(list)+1
     maximum=max(list)
-    for element in xrange(len(list)):
+    for element in range(len(list)):
         if list[element]==maximum:
             maxplace=element
             return maxplace
@@ -219,8 +219,8 @@ def sobel(img):
     outdata = out_image.load()
     gx = [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]
     gy = [[-1, -2, -1], [0, 0, 0], [1, 2, 1]]
-    for row in xrange(1, img.size[0]-1):
-        for col in xrange(1, img.size[1]-1):
+    for row in range(1, img.size[0]-1):
+        for col in range(1, img.size[1]-1):
             pixel_gx = pixel_gy = 0
             pxval = sum(imgdata[row,col])/3
             for i in range(-1, 2):
@@ -232,7 +232,7 @@ def sobel(img):
             newpixel = 255 - int(newpixel)
             outdata[row, col] = (newpixel, newpixel, newpixel)
     finishing=time.time()
-    print "Sobel Edge Detection Took: ", finishing-starting, " seconds."
+    print("Sobel Edge Detection Took: ", finishing-starting, " seconds.")
     del imgdata
     del outdata
     gc.collect()
@@ -276,19 +276,19 @@ def prewitt(img):
     outimg = Image.new('L', (width, height))  
     outpixels = list(outimg.getdata())  
 
-    for y in xrange(height):  
-        for x in xrange(width):  
+    for y in range(height):  
+        for x in range(width):  
             sumX, sumY, magnitude = 0, 0, 0  
 
             if y == 0 or y == height-1: magnitude = 0  
             elif x == 0 or x == width-1: magnitude = 0  
             else:  
-                for i in xrange(-1, 2):  
-                    for j in xrange(-1, 2):  
+                for i in range(-1, 2):  
+                    for j in range(-1, 2):  
                         # convolve the image pixels with the Prewitt mask, approximating dI / dx  
                         sumX += (pixels[x+i+(y+j)*width]) * xmask[i+1, j+1]
-                for i in xrange(-1, 2):  
-                    for j in xrange(-1, 2):  
+                for i in range(-1, 2):  
+                    for j in range(-1, 2):  
                         # convolve the image pixels with the Prewitt mask, approximating dI / dy  
                         sumY += (pixels[x+i+(y+j)*width]) * ymask[i+1, j+1]  
                 # approximate the magnitude of the gradient  
@@ -298,7 +298,7 @@ def prewitt(img):
             outpixels[x+y*width] = 255 - magnitude
     outimg.putdata(outpixels)
     finishing=time.time()
-    print "Prewitt Edge Detection Took: ", finishing-starting, " seconds."
+    print("Prewitt Edge Detection Took: ", finishing-starting, " seconds.")
     return outimg  
 
 def automaticSetThreshold(histim):
@@ -338,7 +338,7 @@ def automaticSetThreshold(histim):
     # Check for truncated peaks (maxima at edges)
     if listnew[0]>listnew[1]:
         maxima.append((1,listnew[1]))
-    for pixintensity in xrange(1,254):
+    for pixintensity in range(1,254):
         # The last condition is to help prevent minor wiggles being identified as extrema
         if listnew[pixintensity]>=listnew[pixintensity-1] and listnew[pixintensity+1]<listnew[pixintensity] and scalednew[pixintensity]>0.000141285:
             maxima.append((pixintensity,listnew[pixintensity]))
@@ -376,7 +376,7 @@ def automaticSetThreshold(histim):
     # First build a list of x,y frequency data
     freq=[]
     intense=[]
-    for i in xrange(0,256):
+    for i in range(0,256):
         intense.append(i)
         freq.append(float(histlist[i])/float(sum(histlist)))
     # Pass the original histogram to R
@@ -387,7 +387,7 @@ def automaticSetThreshold(histim):
     # the maximum value is on the edge, the expected value is somewhat in from the edge)
     E1=max(mu1est,10.0)
     E2=min(mu2est,250.0)
-    print thetabest, mu1est, mu2est,
+    print(thetabest, mu1est, mu2est, end=' ')
     # Increment these by one to account for the converting 0:255 -> 1:256
     E1=E1+1
     E2=E2+1
@@ -570,7 +570,7 @@ if(root<0) try((root=uniroot(diffFunc,c(1,256),p=reslist)$root),silent=TRUE)
 ##dev.off()
 """)
     except:
-        print "RPy Exception"
+        print("RPy Exception")
     # This is to work around an rpy bug!
     r.histlist[0]+=1
     r.histlist[0]-=1
@@ -582,15 +582,15 @@ if(root<0) try((root=uniroot(diffFunc,c(1,256),p=reslist)$root),silent=TRUE)
     MU2=r.reslist[2]
     THETA=r.reslist[0]
     del r.reslist
-    print "Theta, Mu1, Mu2, Sigma1, Sigma2"
-    print THETA, MU1,MU2,SIGMA1,SIGMA2
-    print "Roots: ",r.roots
+    print("Theta, Mu1, Mu2, Sigma1, Sigma2")
+    print(THETA, MU1,MU2,SIGMA1,SIGMA2)
+    print("Roots: ",r.roots)
     del r.roots
 
     # Convert back to 
     optthresh=r.root-1
-    print "Threshold:", optthresh
-    print "Using threshold from double Gaussian fit: "+str(optthresh)
+    print("Threshold:", optthresh)
+    print("Using threshold from double Gaussian fit: "+str(optthresh))
     if graphicsout:
         # Draw the histogram for trouble shooting
         plotHistograms(histlist,r.totpts,optthresh)
@@ -618,7 +618,7 @@ def plotHistograms(histlist,funcpts,cut):
     freqmax=float(max(max(histlist),max(funcpts)))
     histcoords=[]
     funccoords=[]
-    for i in xrange(len(histlist)):
+    for i in range(len(histlist)):
         histcoords.append((i*widthFactor,int(round(plotHeight*float(histlist[i])/freqmax))))
         funccoords.append((i*widthFactor,int(round(plotHeight*float(funcpts[i])))))
     plot=Image.new("RGB",(plotWidth,plotHeight),'white')
@@ -644,7 +644,7 @@ def BackgroundCorrection(im,threshim):
     greyim=im.convert(mode="L")
     greypix=numpy.array(greyim,numpy.uint8)
     # Strongly smooth it before doing the initial thresholding
-    for count in xrange(5):
+    for count in range(5):
         greyim=greyim.filter(ImageFilter.SMOOTH_MORE)
     # SAVE IMAGE
     if graphicsout:
@@ -653,8 +653,8 @@ def BackgroundCorrection(im,threshim):
     # Now we want to calculate the median intensity of pixels which are marked as background within the
     # relevant frame of tiles (Should this be the mode intensity?)
     intensities=[]
-    for x in xrange(xstart+xdim*LightStrip,min(w-1,xstart+xdim*(nocols-LightStrip))):
-        for y in xrange(ystart+ydim*LightStrip,min(h-1,ystart+ydim*(norows-LightStrip))):
+    for x in range(xstart+xdim*LightStrip,min(w-1,xstart+xdim*(nocols-LightStrip))):
+        for y in range(ystart+ydim*LightStrip,min(h-1,ystart+ydim*(norows-LightStrip))):
             if threshpix[y,x]<128:
                 # This is background
                 intensities.append(greypix[y,x])
@@ -665,7 +665,7 @@ def BackgroundCorrection(im,threshim):
     # Skip background correction
     if lightCorrect==False:
         return(im)
-    print "Median Background Intensity: ",medintensity
+    print("Median Background Intensity: ",medintensity)
     # Disable the correction!!!!
     #return im
     # Now we copy the greyim, and smooth it to have less noisy interpolation across the holes
@@ -679,11 +679,11 @@ def BackgroundCorrection(im,threshim):
     # Ok, let's scan through this image, and everywhere there is a zero, let's
     # replace it with the median of its neighbours that are not zero
     # This parameter gives the size of the neighbourhood:(scandim*2+1)x(scandim*2+1)
-    print "Horizontal scan"
+    print("Horizontal scan")
     x=0
     y=0
     while y<h:
-        if y%100==0: print y," out of ",h
+        if y%100==0: print(y," out of ",h)
         while x<w:
             # Check if we are at the beginning of a hole
             if threshpix[y,x]>0:
@@ -730,7 +730,7 @@ def BackgroundCorrection(im,threshim):
                 # Now we have our two points and our best background values for those points,
                 # we can linearly interpolate between them
                 m=(bestbackground2-bestbackground1)/(P2-P1)
-                for P in xrange(P1+1,P2):
+                for P in range(P1+1,P2):
                     numpixH[y,P]=m*(P-P1)+bestbackground1
                 # Now we can set x to be the next point after P2
                 x=P2+1
@@ -746,11 +746,11 @@ def BackgroundCorrection(im,threshim):
     # Ok, let's scan through this image, and everywhere there is a zero, let's
     # replace it with the median of its neighbours that are not zero
     # This parameter gives the size of the neighbourhood:(scandim*2+1)x(scandim*2+1)
-    print "Vertical scan"
+    print("Vertical scan")
     x=0
     y=0
     while x<w:
-        if x%100==0: print x," out of ",w
+        if x%100==0: print(x," out of ",w)
         while y<h:
             # Check if we are at the beginning of a hole
             if threshpix[y,x]>0:
@@ -797,7 +797,7 @@ def BackgroundCorrection(im,threshim):
                 # Now we have our two points and our best background values for those points,
                 # we can linearly interpolate between them
                 m=(bestbackground2-bestbackground1)/(P2-P1)
-                for P in xrange(P1+1,P2):
+                for P in range(P1+1,P2):
                     numpixV[P,x]=m*(P-P1)+bestbackground1
                 # Now we can set x to be the next point after P2
                 y=P2+1
@@ -875,14 +875,14 @@ def spiralsearch(x0,y0,N):
     sx,sy=x0,y0
     xnew,ynew=x0,y0
     outlist=[[x0,y0]]
-    for rad in xrange(1,2*N+1):
+    for rad in range(1,2*N+1):
         Direct=Direct*-1
         # Move along y axis
-        for xnew in xrange(sx+Direct,sx+rad*Direct+Direct,Direct):
+        for xnew in range(sx+Direct,sx+rad*Direct+Direct,Direct):
             outlist.append([xnew,ynew])
         sx=xnew
         # Move along x axis
-        for ynew in xrange(sy+Direct,sy+rad*Direct+Direct,Direct):
+        for ynew in range(sy+Direct,sy+rad*Direct+Direct,Direct):
             outlist.append([xnew,ynew])
         sy=ynew
     return outlist
@@ -991,7 +991,7 @@ while 1:
         xstart,ystart=xstart/2,ystart/2
         NSearch=NSearch/2
     
-    print filename+' loaded...  '
+    print(filename+' loaded...  ')
     # Make up a mask for doing the background correction
     # Do edge detection
     edgeim=sobel(im)
@@ -1018,7 +1018,7 @@ while 1:
 
     # Get histogram
     histlist=region.histogram()
-    print "Histogram Ready!"
+    print("Histogram Ready!")
 
     # Get the top qq*100% highest gradients
     qq=0.05
@@ -1056,8 +1056,8 @@ while 1:
         blank.save(os.path.join(outputimages,'ThresholdedGradientMask.PNG'))
 
     # Now let's run through the tiles and threshold each one individually
-    for ROW in xrange(norows):
-        for COL in xrange(nocols):
+    for ROW in range(norows):
+        for COL in range(nocols):
             xnow,ynow = xstart+int(round(float(COL)*xdimf)), ystart+int(round(float(ROW)*ydimf))
             # Get the darkest pixel in the tile
             #darkpix=edgepix[ynow:ynow+ydim,xnow:xnow+xdim].min()-1
@@ -1093,7 +1093,7 @@ while 1:
 
     cutoff=automaticSetThreshold(finalim)
     finish=time.time()
-    print 'Thresholding complete '+str(int(round(finish-start)))+'sec  Building arrays...'
+    print('Thresholding complete '+str(int(round(finish-start)))+'sec  Building arrays...')
     start=time.time()
 
     pixarr=numpy.array(finalim,numpy.uint8)
@@ -1107,14 +1107,14 @@ while 1:
     # Let's just find the fraction of white pixels in the image
     tarr=numpy.array(threshim1chan,numpy.uint8)
     sumtotpix=0
-    for x in xrange(w):
+    for x in range(w):
         sumtotpix+=sum(tarr[0:,x])/255
     fracpix=float(sumtotpix)/float(w*h)
     # If this fraction is ridiculously small (black) or ridiculously large (white)
     # then let's try the thresholding again!
     mutcount=0
     while (fracpix<0.05 or fracpix>0.80) and mutcount<10:
-        print "Analyzing again....",mutcount
+        print("Analyzing again....",mutcount)
         cutoff=automaticSetThreshold(finalim)
         pixarr=numpy.array(finalim,numpy.uint8)
         origarr=numpy.array(im,numpy.uint8)
@@ -1122,7 +1122,7 @@ while 1:
         threshim1chan=greyim.point(lambda p:(p>cutoff) and 255)
         tarr=numpy.array(threshim1chan,numpy.uint8)
         sumtotpix=0
-        for x in xrange(w):
+        for x in range(w):
                 sumtotpix+=sum(tarr[0:,x])/255
         fracpix=float(sumtotpix)/float(w*h)    
         mutcount+=1
@@ -1140,7 +1140,7 @@ while 1:
 
     tilearr=numpy.zeros((ydim,xdim,3),numpy.uint8)
     finish=time.time()            
-    print 'Arrays built...'+str(int(round(finish-start)))+'sec  Performing Analysis and Saving Tiles...'
+    print('Arrays built...'+str(int(round(finish-start)))+'sec  Performing Analysis and Saving Tiles...')
     start=time.time()
 
     if graphicsout:
@@ -1154,8 +1154,8 @@ while 1:
     # FILENAME ROW COLUMN TOPLEFTX TOPLEFTY WHITEAREA(px) TRIMMED THRESHOLD INTENSITY EDGEPIXELS COLR COLG COLB BKR BKG BKB EDGELEN XDIM YDIM
     tilecoords=[]
 
-    for ROW in xrange(norows):
-        for COL in xrange(nocols):
+    for ROW in range(norows):
+        for COL in range(nocols):
 	    # Initialise counters for this cell
             # Declaring the types (int) to stop these counters getting typecast as uint later (problems with -1=255)
             WHITEAREA=int(0)
@@ -1177,8 +1177,8 @@ while 1:
             edgetest=scanedge(xnow,ynow)
             xmid,ymid,npoints=0,0,0
             # Add up the x and y coordinates (and count the number of white pixels inside the cell)
-            for x in xrange (xnow,xnow+xdim):
-                for y in xrange (ynow,ynow+ydim):
+            for x in range (xnow,xnow+xdim):
+                for y in range (ynow,ynow+ydim):
                     if thresharr[y,x][0]>128:
                         xmid+=x
                         ymid+=y
@@ -1191,8 +1191,8 @@ while 1:
                 if colonySearch and xmid>=0 and xmid<w-xdim and ymid>=0 and ymid<h-ydim and scanedge(xmid,ymid)-edgetest<=int(round(2*(xdim+ydim)*0.02)):
                     xnow,ynow=xmid,ymid                        
 
-            for x in xrange(xnow,xnow+xdim):
-                for y in xrange(ynow,ynow+ydim):
+            for x in range(xnow,xnow+xdim):
+                for y in range(ynow,ynow+ydim):
                     # Fill the tile array for outputting later
                     tilearr[y-ynow,x-xnow]=origarr[y,x]
                     # Add total intensities
@@ -1254,9 +1254,9 @@ while 1:
                 Trimmed[ROW,COL]=IPWA
                 Untrimmed[ROW,COL]=TOTALINTENSITY
         # Just to let us know how we're getting on
-        print "Row: "+str(ROW+1)
+        print("Row: "+str(ROW+1))
     finish=time.time()
-    print 'Analysis Finished and Tiles Saved...'+str(int(round(finish-start)))+'sec  Building Previews...'
+    print('Analysis Finished and Tiles Saved...'+str(int(round(finish-start)))+'sec  Building Previews...')
     start=time.time()
 
     if graphicsout:
@@ -1264,8 +1264,8 @@ while 1:
         FracMax=0.1
         GrowthImArr=numpy.zeros((norows*pixdim,nocols*pixdim,3), numpy.uint8)
         # For Darren's growth gradient, let's build a difference array
-        for ROW in xrange(norows):
-            for COL in xrange(nocols):
+        for ROW in range(norows):
+            for COL in range(nocols):
                 Frac=(Untrimmed[ROW,COL]-Trimmed[ROW,COL])/Untrimmed[ROW,COL]
                 LookupColour=int(round((Frac/FracMax)*255.0))
                 FracDiff[ROW,COL]=Frac
@@ -1323,7 +1323,7 @@ while 1:
 ##    smallThresh.save(os.path.join(outputimages,FILENAME +'ThreshPreview.jpeg'),quality=100)
 
     finish=time.time()
-    print 'Previews created...'+str(int(round(finish-start)))+'sec  Total time: '+str(int(round(finish-totalstart)))+' sec'
+    print('Previews created...'+str(int(round(finish-start)))+'sec  Total time: '+str(int(round(finish-totalstart)))+' sec')
     singleout.close()
     # Let's clear some memory for the next round
     del im,edgeim,invedge,newim,region,edgethresh,edgearr,blank,imcp,original

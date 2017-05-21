@@ -20,7 +20,7 @@ def checkImages(fdir,fdict=None,barcRange=(0,-24),verbose=False):
         with open(fdict, 'rb') as fp:
             barcdict = json.load(fp)
             # Drop any barcodes that are currently being analysed/already analysed
-            barcdict={x:barcdict[x] for x in barcdict.keys() if not c2.checkAnalysisStarted(barcdict[x][-1])}
+            barcdict={x:barcdict[x] for x in list(barcdict.keys()) if not c2.checkAnalysisStarted(barcdict[x][-1])}
     else:
         # Find image files which have yet to be analysed
         # Lydall lab file naming convention (barcRange)
@@ -82,7 +82,7 @@ def buildVars(inp=''):
         nrow,ncol=c2.parsePlateFormat(inp.fmt[0])
     else:
         nrow,ncol=[int(x) for x in inp.fmt]
-    print("Expecting {} rows and {} columns on plate.".format(nrow,ncol))
+    print(("Expecting {} rows and {} columns on plate.".format(nrow,ncol)))
     
     if inp.usedict is None:
         fdict=None    
@@ -90,7 +90,7 @@ def buildVars(inp=''):
         fdict=os.path.realpath(inp.usedict)
     else:
         fdict=locateJSON(inp.usedict,os.path.realpath(inp.logsdir),verbose)
-    if fdict is not None and not os.path.exists(fdict): print("WARNING! "+fdict+" does not exist...")
+    if fdict is not None and not os.path.exists(fdict): print(("WARNING! "+fdict+" does not exist..."))
 
     if inp.lc:
         diffIms=True
@@ -120,7 +120,7 @@ def buildVars(inp=''):
             print("Using user-specified initial guess for colony locations.  NOTE: Colonyzer.txt file must be located in directory with images to be analysed.  See Parametryzer for more information.")
         else:
             print("Searching for colony locations automatically.")
-            print("Checking "+str(inp.updates)+" (quasi-random) candidate grid positions in first phase of grid location")
+            print(("Checking "+str(inp.updates)+" (quasi-random) candidate grid positions in first phase of grid location"))
         if inp.greenlab:
             print("Removing images identified as containing GreenLab lids.")
         if inp.lc:
@@ -131,11 +131,11 @@ def buildVars(inp=''):
         if fixedThresh==-99 and not inp.edgemask:
             print("Image segmentation by automatic thresholding.")
         elif not inp.edgemask:
-            print("Images will be segmented using fixed threshold: "+str(fixedThresh)+".")
+            print(("Images will be segmented using fixed threshold: "+str(fixedThresh)+"."))
         else:
             print("Images will be segemented by intensity gradient and morphology instead of by thresholding.")
         if fdict is not None and os.path.exists(fdict):
-            print("Preparing to load barcodes from "+fdict+".")
+            print(("Preparing to load barcodes from "+fdict+"."))
     res={'lc':inp.lc,'fixedThresh':fixedThresh,'plots':inp.plots,'initpos':inp.initpos,'fdict':fdict,'fdir':fdir,'nrow':nrow,'ncol':ncol,'cut':cut,'verbose':verbose,'diffims':diffIms,'updates':inp.updates,'endpoint':inp.endpoint,'edgemask':inp.edgemask,'greenlab':inp.greenlab}
     return(res)
 
@@ -154,9 +154,9 @@ def prepareTimecourse(barcdict,verbose=False,chklid=lambda x:False):
     EARLIESTIMAGE=IMs[-1]
     imRoot=EARLIESTIMAGE.split(".")[0]
     if verbose:
-        print("Analysing images labelled with the barcode "+BARCODE+" in "+imdir)
-        print("Earliest image: "+EARLIESTIMAGE)
-        print("Latest image: "+LATESTIMAGE)
+        print(("Analysing images labelled with the barcode "+BARCODE+" in "+imdir))
+        print(("Earliest image: "+EARLIESTIMAGE))
+        print(("Latest image: "+LATESTIMAGE))
     return((BARCODE,imdir,LATESTIMAGE,EARLIESTIMAGE,imRoot))
 
 def loadLocationGuesses(IMAGE,InsData):
@@ -200,13 +200,13 @@ def edgeFill2(arr,cutoff=0.8):
     return(fillN)
 
 def main(inp=""):
-    print("Colonyzer "+c2.__version__)
+    print(("Colonyzer "+c2.__version__))
     
     var=buildVars(inp=inp)
     correction,fixedThresh,plots,initpos,fdict,fdir,nrow,ncol,cut,verbose,diffIms,updates,endpoint,edgemask,greenlab=(var["lc"],var["fixedThresh"],var["plots"],var["initpos"],var["fdict"],var["fdir"],var["nrow"],var["ncol"],var["cut"],var["verbose"],var["diffims"],var["updates"],var["endpoint"],var["edgemask"],var["greenlab"])
     barcdict=checkImages(fdir,fdict,verbose=verbose)
     if greenlab:
-        barcdict={x:barcdict[x] for x in barcdict.keys() if not c2.checkAnalysisStarted(barcdict[x][-1])}
+        barcdict={x:barcdict[x] for x in list(barcdict.keys()) if not c2.checkAnalysisStarted(barcdict[x][-1])}
     rept=c2.setupDirectories(barcdict,verbose=verbose)
 
     if greenlab:
@@ -312,12 +312,12 @@ def main(inp=""):
             imthresh.save(os.path.join(os.path.dirname(FILENAME),"Output_Images",os.path.basename(FILENAME).split(".")[0]+".png"))
 
             # Get ready for next image
-            if verbose: print("Finished {0} in {1:.2f}s".format(os.path.basename(FILENAME),time.time()-startim))
+            if verbose: print(("Finished {0} in {1:.2f}s".format(os.path.basename(FILENAME),time.time()-startim)))
 
         # Get ready for next image
-        if verbose: print("Finished {0} in {1:.2f}s".format(os.path.basename(BARCODE),time.time()-start))
+        if verbose: print(("Finished {0} in {1:.2f}s".format(os.path.basename(BARCODE),time.time()-start)))
 
-        barcdict={x:barcdict[x] for x in barcdict.keys() if not c2.checkAnalysisStarted(barcdict[x][-1])}
+        barcdict={x:barcdict[x] for x in list(barcdict.keys()) if not c2.checkAnalysisStarted(barcdict[x][-1])}
         if plots:
             pdf.close()
 

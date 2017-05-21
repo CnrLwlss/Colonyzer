@@ -32,11 +32,11 @@ def readInstructions(fullpath,fname='Colonyzer.txt',searchUpStream=False):
             if fullpathnew!=fullpath:
                 fullpath=fullpathnew
             else:
-                raise(ValueError("Searched up to "+fullpath+" but "+fname+" not found in directory structure."))
+                raise ValueError
     fpath=os.path.join(fullpath,fname)
     InsData={}
     if os.path.isfile(fpath):
-        print("Reading instruction file output from "+fpath)
+        print(("Reading instruction file output from "+fpath))
         Instructions=open(fpath,'r')
         InsTemp=Instructions.readlines()
         defaultArr=[]
@@ -297,7 +297,7 @@ def makeGrid(pos0,ny,nx,dy,dx,theta=0,makeGaps=False,gapsOutside=True):
     rads=2*math.pi*theta/360.0
     s=math.sin(-rads)
     c=math.cos(-rads)
-    vpos=[range(ny),range(nx)]
+    vpos=[list(range(ny)),list(range(nx))]
     gpos=list(itertools.product(*vpos))
     pos=[(y0+gp[0]*dy,x0+gp[1]*dx) for gp in gpos]
     pos=rotateGrid(pos0,pos,theta)
@@ -306,7 +306,7 @@ def makeGrid(pos0,ny,nx,dy,dx,theta=0,makeGaps=False,gapsOutside=True):
             gd=1
         else: # gaps only inside grid
             gd=-1
-        vgap=[range(ny+gd),range(nx+gd)]
+        vgap=[list(range(ny+gd)),list(range(nx+gd))]
         ggap=list(itertools.product(*vgap))
         gap=[(int(round(y0-gd*dy/2.0+gp[0]*dy)),int(round(x0-gd*dx/2.0+gp[1]*dx))) for gp in gpos]
         gap=rotateGrid(pos0,gap,theta)
@@ -332,7 +332,7 @@ def checkPoints(arr,ny,nx,pos0,dy,dx,theta=0,gapsOutside=True):
 
 def fitProjection(proj,delt,n,sp=0.0,st=0.0,gapsOutside=True):
     '''Find grid position that best fits a 1D projection of intensity by brute force'''
-    checkinds=range(int(round(delt/2.0)),int(round(len(proj)-delt*n)))
+    checkinds=list(range(int(round(delt/2.0)),int(round(len(proj)-delt*n))))
     if gapsOutside:
         gd=1
     else:
@@ -340,7 +340,7 @@ def fitProjection(proj,delt,n,sp=0.0,st=0.0,gapsOutside=True):
     def getObj(i,proj,sp,st):
         peaks=proj[i:int(round((i+delt*n))):int(round(delt))]
         troughs=proj[int(round((i-gd*delt/2.0))):int(round((i+delt*(n+gd*0.5)))):int(round(delt))]
-        diffs=[p-t for p,t in zip(peaks,troughs)+zip(reversed(peaks),reversed(troughs))]
+        diffs=[p-t for p,t in list(zip(peaks,troughs))+list(zip(reversed(peaks),reversed(troughs)))]
         return(np.mean(diffs)-sp*np.std(peaks)-st*np.std(troughs))
         #return(np.median(peaks)-np.median(troughs)-sp*np.std(peaks)-st*np.std(troughs))
     grds=[getObj(i,proj,sp,st) for i in checkinds]
@@ -386,8 +386,8 @@ def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=False,
     ### in horizontal and vertical ACF.  Optimise with fixed dx, for a range of dx.
 
     dd=int(round(0.01*dx))
-    xtest=range(dx-dd,min(int(round(arr.shape[1]/nx))-1,dx+dd))
-    ytest=range(dy-dd,min(int(round(arr.shape[0]/ny))-1,dy+dd))
+    xtest=list(range(dx-dd,min(int(round(arr.shape[1]/nx))-1,dx+dd)))
+    ytest=list(range(dy-dd,min(int(round(arr.shape[0]/ny))-1,dy+dd)))
     xvals=[fitProjection(sumx,int(round(dxval)),nx,1.0,1.0,True) for dxval in xtest]
     yvals=[fitProjection(sumy,int(round(dyval)),ny,1.0,1.0,True) for dyval in ytest]
     xind=np.argmin([x[1] for x in xvals])
@@ -408,7 +408,7 @@ def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=False,
     smarr=ndimage.filters.gaussian_filter(arr,dmin/10.0)
     #showIm(smarr)
 
-    checkvecs=[range(ry),range(rx)]
+    checkvecs=[list(range(ry)),list(range(rx))]
     checkpos=list(itertools.product(*checkvecs))
 
     # Assume we can see the edges of the plate in the image (bright enough to make a peak in the smoothed intensities
@@ -479,7 +479,7 @@ def estimateLocations(arr,nx,ny,windowFrac=0.25,smoothWindow=0.13,showPlt=False,
     ##    sol=op.minimize(optall,x0=soln2,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds],jac=False,options={'eps':0.005,'disp':optmess,'gtol':0.1})
 
     if verbose:
-        print("Optimisation: "+sol.message+"\n\n")
+        print(("Optimisation: "+sol.message+"\n\n"))
         
     candy,candx=grid(soln,ny,nx)
 
@@ -803,7 +803,7 @@ def setupDirectories(dictlist,verbose=True):
     if isinstance(dictlist,dict):
         # Flatten dictionary to list:
         # dictlist= [x for d in dictlist.itervalues() for x in d] # Python 2.7
-        dictlist= [x for d in dictlist.values() for x in d] 
+        dictlist= [x for d in list(dictlist.values()) for x in d] 
     # Else assume a list
 
     # Get unique set of directories in list:
@@ -818,7 +818,7 @@ def setupDirectories(dictlist,verbose=True):
             os.mkdir(imdir)
             os.mkdir(datdir)
             os.mkdir(repdir)
-            if verbose: print("Created "+imdir+" & "+datdir+" & "+repdir+".")
+            if verbose: print(("Created "+imdir+" & "+datdir+" & "+repdir+"."))
             newdirs.append(directory)
         except:
             continue
@@ -883,7 +883,7 @@ def getBarcodes(fullpath,barcRange=(0,15),checkDone=True,verbose=False):
         fnames=np.array([os.path.basename(x) for x in barcdict[b]])
         barcdict[b]=list(np.array(barcdict[b])[fnames.argsort()])[::-1]
         #barcdict[b].sort(reverse=True)
-    if verbose and not barcdict: print("No new images to analyse found in "+fullpath+".")
+    if verbose and not barcdict: print(("No new images to analyse found in "+fullpath+"."))
     return(barcdict)
 
 def merge_dols(dol1, dol2):
@@ -980,7 +980,7 @@ def locateCultures(candx,candy,dx,dy,arr,nx,ny,update=True,maxupdates=5,fuzzy=0.
 
     if update:
         posnew=[updateLocation(p) for p in zip(cy,cx)]
-    cy,cx=zip(*posnew)
+    cy,cx=list(zip(*posnew))
     
     colvals,rowvals=np.meshgrid(np.arange(1,nx+1),np.arange(1,ny+1))
     d={"Row":rowvals.flatten(),"Column":colvals.flatten(),"y":[cyv+dy/2.0 for cyv in cy],"x":[cxv+dx/2.0 for cxv in cx]}
@@ -1111,16 +1111,16 @@ def viewerSummary(res):
     '''Generate report to help building vertical and horizontal categories for image viewer'''   
     print ("Data summary")
     print ("~~~~~~~~~~~~")
-    print ("Barcode: "+str(len(res["Barcode"].unique())))
-    print ("Library Plates: "+str(len(res["MasterPlate.Number"].unique())))
-    print ("SGA replicate plates: "+str(len(res["RepQuad"].unique())))
-    print ("Screen identifiers: "+str(len(res["Screen.Name"].unique()))+"("+",".join([str(x) for x in res["Screen.Name"].unique()])+")")
+    print(("Barcode: "+str(len(res["Barcode"].unique()))))
+    print(("Library Plates: "+str(len(res["MasterPlate.Number"].unique()))))
+    print(("SGA replicate plates: "+str(len(res["RepQuad"].unique()))))
+    print(("Screen identifiers: "+str(len(res["Screen.Name"].unique()))+"("+",".join([str(x) for x in res["Screen.Name"].unique()])+")"))
     if "ScreenID" in res.columns:
-        print ("Screen IDs: "+str(len(res["ScreenID"].unique()))+"("+",".join([str(x) for x in res["ScreenID"].unique()])+")")
-    print ("Libraries: "+str(len(res["Library.Name"].unique()))+"("+",".join([str(x) for x in res["Library.Name"].unique()])+")")
-    print ("Treatment: "+str(len(res["Treatment"].unique()))+"("+",".join([str(x) for x in res["Treatment"].unique()])+")")
-    print ("Medium: "+str(len(res["Medium"].unique()))+"("+",".join([str(x) for x in res["Medium"].unique()])+")")
-    print ("TreatMed: "+str(len(res["TreatMed"].unique()))+"("+",".join([str(x) for x in res["TreatMed"].unique()])+")")
+        print(("Screen IDs: "+str(len(res["ScreenID"].unique()))+"("+",".join([str(x) for x in res["ScreenID"].unique()])+")"))
+    print(("Libraries: "+str(len(res["Library.Name"].unique()))+"("+",".join([str(x) for x in res["Library.Name"].unique()])+")"))
+    print(("Treatment: "+str(len(res["Treatment"].unique()))+"("+",".join([str(x) for x in res["Treatment"].unique()])+")"))
+    print(("Medium: "+str(len(res["Medium"].unique()))+"("+",".join([str(x) for x in res["Medium"].unique()])+")"))
+    print(("TreatMed: "+str(len(res["TreatMed"].unique()))+"("+",".join([str(x) for x in res["TreatMed"].unique()])+")"))
     print ("")
 
 def getDate(x,fmt="%Y-%m-%d_%H-%M-%S"):
@@ -1263,7 +1263,7 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
     # Split data by horizontal
     hSplit=[res[res[horizontal]==x] for x in horiz]
     for cno,h in enumerate(hSplit):
-        print("Setting up data for column "+str(cno))
+        print(("Setting up data for column "+str(cno)))
         barcRepDict={}
         h["Replicate"]=0
         # Give each barcode a technical replicate number
@@ -1372,7 +1372,7 @@ def makePage(res,closestImage,horizontal,htmlroot="index",title="",scl=1,smw=600
             dat=colDat[colDat["vID"]==vID]
             if dat.shape[0]>0:
                 barc=dat["Barcode"].iloc[0]
-                print("Drawing: "+barc)
+                print(("Drawing: "+barc))
                 for climind,clim in enumerate(closestImage):
                     impath=clim[barc]
                     imroot=os.path.basename(impath).split(".")[0]
@@ -1476,7 +1476,7 @@ def parseAndCombine(imOutDir=".",metaDir=".",exptDesc="ExptDescription.txt",libD
         # Read in experimental metadata
         expt=pd.read_csv(os.path.join(metaDir,exptDesc),sep="\t",header=0)
     except:
-        print(exptDesc+" not found, carrying on...")
+        print((exptDesc+" not found, carrying on..."))
         expt=None
         
     try:
@@ -1484,15 +1484,15 @@ def parseAndCombine(imOutDir=".",metaDir=".",exptDesc="ExptDescription.txt",libD
         libs=pd.read_csv(os.path.join(metaDir,libDesc),sep="\t",header=0)
         libs.columns=[x.rstrip() for x in libs.columns]
     except:
-        print(libDesc+" not found, carrying on...")
+        print((libDesc+" not found, carrying on..."))
         libs=None
 
     try:
         # Read in file describing link between standard gene name and systematic gene name (ORF) as python dictionary orf2g
         g2orf_df=pd.read_csv(os.path.join(metaDir,geneToORF),sep="\t",header=None)
-        orf2g=dict(zip(g2orf_df[0],g2orf_df[1]))
+        orf2g=dict(list(zip(g2orf_df[0],g2orf_df[1])))
     except:
-        print(geneToORF+" not found, carrying on...")
+        print((geneToORF+" not found, carrying on..."))
         orf2g=None
 
     if expt is not None:

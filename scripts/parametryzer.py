@@ -64,7 +64,7 @@ for x in filelist:
         filedict[x]=x
 
 # Get the keys
-keylist=filedict.keys()
+keylist=list(filedict.keys())
 keylist.sort()
 keylist.reverse()
 newfiles=[]
@@ -84,7 +84,7 @@ size=w,h
 counter=0
 LAST=()
 Results=[]
-for x in xrange(len(newfiles)):
+for x in range(len(newfiles)):
     Results.append([])
 
 BkCol=(0,0,0)
@@ -111,7 +111,7 @@ def InitializeImage():
 def SaveResults(Results,Format):
     # Scale the results file up to the original image coordinates
     NewRes=[]
-    for zz in xrange(0,len(Results)):
+    for zz in range(0,len(Results)):
         x=Results[zz]
         filenm=newfiles[zz]
         PhotoName = os.path.join(fullpath,filenm)
@@ -123,9 +123,9 @@ def SaveResults(Results,Format):
     defstring="default,%s,%s,%s,%s,%s,%s"%(Format,str(NewRes[0][0][0]),str(NewRes[0][0][1]),str(NewRes[0][1][0]),str(NewRes[0][1][1]),time.strftime("%Y-%m-%d"))
 
     specstr=""
-    for x in xrange(0,len(Results)):
+    for x in range(0,len(Results)):
         if useRoot:
-            filenm=rootdict.keys()[x]
+            filenm=list(rootdict.keys())[x]
         else:
             filenm=newfiles[x]
         specstr+="%s,%s,%s,%s,%s,%s\n"%(filenm,Format,str(NewRes[x][0][0]),str(NewRes[x][0][1]),str(NewRes[x][1][0]),str(NewRes[x][1][1]))

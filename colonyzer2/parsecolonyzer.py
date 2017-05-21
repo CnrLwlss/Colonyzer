@@ -29,7 +29,7 @@ def parseAndCombine(imOutDir=".",exptDesc="ExptDescription.txt",libDesc="Library
         # Read in experimental metadata
         expt=pd.read_csv(exptDesc,sep="\t",header=0)
     except:
-        print(exptDesc+" not found, carrying on...")
+        print((exptDesc+" not found, carrying on..."))
         expt=None
         
     try:
@@ -37,15 +37,15 @@ def parseAndCombine(imOutDir=".",exptDesc="ExptDescription.txt",libDesc="Library
         libs=pd.read_csv(libDesc,sep="\t",header=0)
         libs.columns=[x.rstrip() for x in libs.columns]
     except:
-        print(libDesc+" not found, carrying on...")
+        print((libDesc+" not found, carrying on..."))
         libs=None
 
     try:
         # Read in file describing link between standard gene name and systematic gene name (ORF) as python dictionary orf2g
         g2orf_df=pd.read_csv(geneToORF,sep="\t",header=None)
-        orf2g=dict(zip(g2orf_df[0],g2orf_df[1]))
+        orf2g=dict(list(zip(g2orf_df[0],g2orf_df[1])))
     except:
-        print(geneToORF+" not found, carrying on...")
+        print((geneToORF+" not found, carrying on..."))
         orf2g=None
 
     if expt is not None:
@@ -89,7 +89,7 @@ def parseCombDir(rootDir):
     fmt="%Y-%m-%d_%H-%M-%S"
 
     res=parseAndCombine(imOutDir,exptDesc,libDesc,geneToORF,fout,fmt)
-    print(res.head())
+    print((res.head()))
     
 if __name__ == "__main__":
     parseCombDir("../data/p15/")

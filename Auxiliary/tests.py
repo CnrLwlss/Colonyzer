@@ -68,8 +68,8 @@ rx=arr.shape[1]-nx*dx
 ### in horizontal and vertical ACF.  Optimise with fixed dx, for a range of dx.
 
 dd=int(round(0.01*dx))
-xtest=range(dx-dd,min(int(round(arr.shape[1]/nx))-1,dx+dd))
-ytest=range(dy-dd,min(int(round(arr.shape[0]/ny))-1,dy+dd))
+xtest=list(range(dx-dd,min(int(round(arr.shape[1]/nx))-1,dx+dd)))
+ytest=list(range(dy-dd,min(int(round(arr.shape[0]/ny))-1,dy+dd)))
 xvals=[fitProjection(sumx,int(round(dxval)),nx,1.0,1.0,True) for dxval in xtest]
 yvals=[fitProjection(sumy,int(round(dyval)),ny,1.0,1.0,True) for dyval in ytest]
 xind=numpy.argmin([x[1] for x in xvals])
@@ -89,7 +89,7 @@ plotAC(sumy,sumx,candy,candx,maximay,maximax,pdf=pdf,main="Projection Estimate")
 smarr=ndimage.filters.gaussian_filter(arr,dmin/10.0)
 showIm(smarr)
 
-checkvecs=[range(ry),range(rx)]
+checkvecs=[list(range(ry)),list(range(rx))]
 checkpos=list(itertools.product(*checkvecs))
 
 # Assume we can see the edges of the plate in the image (bright enough to make a peak in the smoothed intensities
@@ -159,7 +159,7 @@ soln=[b[0]+xv*(b[1]-b[0]) for b,xv in zip(bounds,sol.x)]
 ##    sol=op.minimize(optall,x0=soln2,method="L-BFGS-B",bounds=[(0.0,1.0) for b in bounds],jac=False,options={'eps':0.005,'disp':optmess,'gtol':0.1})
 
 if verbose:
-    print("Optimisation: "+sol.message+"\n\n")
+    print(("Optimisation: "+sol.message+"\n\n"))
     
 candy,candx=grid(soln,ny,nx)
 
