@@ -683,9 +683,7 @@ def plotModel(bindat,thresholds=(),label="",pdf=None):
 
 def getEdges(arr,cutoff=0.9975):
     '''Sobel edge detection for 2d array using scipy functions'''
-    sx = ndimage.sobel(arr, axis=0)
-    sy = ndimage.sobel(arr, axis=1)
-    sob = np.hypot(sx, sy)
+    sob = np.hypot(ndimage.sobel(arr, axis=0), ndimage.sobel(arr, axis=1))
     sob[sob<stats.mstats.mquantiles(sob,cutoff)[0]]=0
     sob[sob>0]=1
     return(np.array(sob,dtype=np.bool))  

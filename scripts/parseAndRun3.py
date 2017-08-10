@@ -255,7 +255,7 @@ def main(inp=""):
             # Update guesses and initialise locations data frame
             locationsN=c2.locateCultures([int(round(cx-dx/2.0)) for cx in candx],[int(round(cy-dy/2.0)) for cy in candy],dx,dy,arrloc,ncol,nrow,update=True)
 
-            mask=edgeFill2(arrN,var.slopefill)
+            mask=edgeFill2(arrN,var['slopefill'])
             grd=mask.copy()
             grd[:,:]=False
             grd[int(round(min(locationsN.y-dy/2))):int(round(max(locationsN.y+dy/2))),int(round(min(locationsN.x-dx/2))):int(round(max(locationsN.x+dx/2)))]=True
@@ -290,11 +290,11 @@ def main(inp=""):
                 # Subtract background (corrects for lighting differences within plate/image as well as making agar intensity correspond to zero signal)
                 arr=np.maximum(arr-pseudoempty,0)
 
-                mask_timepoint=edgeFill2(arr,var.slopefill)
-                spots_timepoint=np.logical_and(grd,mask_timepoint)                
+                mask=edgeFill2(arr,var['slopefill'])
+                spots_timepoint=np.logical_and(grd,mask)                
                 
                 # Measure culture phenotypes
-                locations=c2.measureSizeAndColour(locationsN,arr,im,spots_timepoint,0,BARCODE,FILENAME[0:-4])
+                locations=c2.measureSizeAndColour(locationsN,arr,im,spots,0,BARCODE,FILENAME[0:-4])
 
                 # Write results to file
                 locations.to_csv(os.path.join(os.path.dirname(FILENAME),"Output_Data",os.path.basename(FILENAME).split(".")[0]+".out"),"\t",index=False)
