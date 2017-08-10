@@ -41,14 +41,15 @@ def parseArgs(inp=''):
     parser.add_argument("-q","--quiet", help="Suppress messages printed to screen during analysis?", action="store_true")
     parser.add_argument("-e","--endpoint", help="Only analyse final image in series.  Mostly for testing single image analysis.",action="store_true")
     parser.add_argument("-k","--edgemask", help="Use intensity gradient & morphology for image segmentation instead of thresholding.",action="store_true")
+    parser.add_argument("-s","--slopefill", type=float, help="Magnitude of slope defining edge of colony area (affects construction of pseudo-empty plate during lighting correction as well as Trimmed & Area measures)", default=0.9)
     parser.add_argument("-g","--greenlab", help="Check for presence of GreenLab lids on plates.",action="store_true")
-    
     parser.add_argument("-d","--dir", type=str, help="Directory in which to search for image files that have not been analysed (current directory by default).",default=".")
     parser.add_argument("-l","--logsdir", type=str, help="Directory in which to search for JSON files listing images for analyis (e.g. LOGS3, root of HTS filestore).  Only used when intending to specify images for analysis in .json file (see -u).",default=".")
     parser.add_argument("-f","--fixthresh", type=float, help="Image segmentation threshold value (default is automatic thresholding).")
     parser.add_argument("-u","--usedict", type=str, help="Load .json file specifying images to analyse.  If argument has a .json extension, treat as filename.  Otherwise assume argument is a HTS-style screen ID and return path to appropriate .json file from directory structure.  See C2Find.py in HTSauto package.")
     parser.add_argument("-o","--fmt", type=str, nargs='+', help="Specify rectangular grid format, either using integer shorthand (e.g. -o 96, -o 384, -o 768 -o 1536) or explicitly specify number of rows followed by number of columns (e.g.: -o 24 16 or -o 24x16).", default=['384'])
     parser.add_argument("-t","--updates", type=int, help="Number of (quasi-)randomly distributed grid positions to assess in first phase of grid location.  Ignored when -initpos specified.", default=144)
+    
     
     if inp=="":
         args = parser.parse_args()
@@ -136,7 +137,10 @@ def buildVars(inp=''):
             print("Images will be segemented by intensity gradient and morphology instead of by thresholding.")
         if fdict is not None and os.path.exists(fdict):
             print("Preparing to load barcodes from "+fdict+".")
-    res={'lc':inp.lc,'fixedThresh':fixedThresh,'plots':inp.plots,'initpos':inp.initpos,'fdict':fdict,'fdir':fdir,'nrow':nrow,'ncol':ncol,'cut':cut,'verbose':verbose,'diffims':diffIms,'updates':inp.updates,'endpoint':inp.endpoint,'edgemask':inp.edgemask,'greenlab':inp.greenlab}
+    res={'lc':inp.lc,'fixedThresh':fixedThresh,'plots':inp.plots,'initpos':inp.initpos,
+         'fdict':fdict,'fdir':fdir,'nrow':nrow,'ncol':ncol,'cut':cut,'verbose':verbose,
+         'diffims':diffIms,'updates':inp.updates,'endpoint':inp.endpoint,'edgemask':inp.edgemask,
+         'greenlab':inp.greenlab,'slopefill':inp.slopefill}
     return(res)
 
 def locateJSON(scrID,dirHTS='.',verbose=False):
@@ -251,7 +255,7 @@ def main(inp=""):
             # Update guesses and initialise locations data frame
             locationsN=c2.locateCultures([int(round(cx-dx/2.0)) for cx in candx],[int(round(cy-dy/2.0)) for cy in candy],dx,dy,arrloc,ncol,nrow,update=True)
 
-            mask=edgeFill2(arrN,0.9)
+            mask=edgeFill2(arrN,var.slopefill)
             grd=mask.copy()
             grd[:,:]=False
             grd[int(round(min(locationsN.y-dy/2))):int(round(max(locationsN.y+dy/2))),int(round(min(locationsN.x-dx/2))):int(round(max(locationsN.x+dx/2)))]=True
@@ -285,9 +289,12 @@ def main(inp=""):
                 arr=np.maximum(0,np.minimum(255,arr-(ave-ave0)))
                 # Subtract background (corrects for lighting differences within plate/image as well as making agar intensity correspond to zero signal)
                 arr=np.maximum(arr-pseudoempty,0)
+
+                mask_timepoint=edgeFill2(arr,var.slopefill)
+                spots_timepoint=np.logical_and(grd,mask_timepoint)                
                 
                 # Measure culture phenotypes
-                locations=c2.measureSizeAndColour(locationsN,arr,im,spots,0,BARCODE,FILENAME[0:-4])
+                locations=c2.measureSizeAndColour(locationsN,arr,im,spots_timepoint,0,BARCODE,FILENAME[0:-4])
 
                 # Write results to file
                 locations.to_csv(os.path.join(os.path.dirname(FILENAME),"Output_Data",os.path.basename(FILENAME).split(".")[0]+".out"),"\t",index=False)
