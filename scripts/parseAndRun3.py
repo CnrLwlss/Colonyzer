@@ -302,12 +302,12 @@ def main(inp=""):
 
                 # Visual check of culture locations
                 useMask=False
-                linewidth=max(1,int(round(min(im.size)/350.0)))
+                linewidth=max(1,int(round(min(im.size)/500.0)))
                 if useMask:
-                    impreview=c2.threshPreview(locations,mask,None,linethick=linewidth)
+                    impreview=c2.threshPreview(locations,mask,None,linethick=linewidth,circlerad=linewidth)
                 else:
                     arr_stretch=255*arr/np.max(arr)
-                    impreview=c2.threshPreview(locations,arr_stretch,None,linethick=linewidth)
+                    impreview=c2.threshPreview(locations,arr_stretch,None,linethick=linewidth,circlerad=linewidth)
 
                 r=5
                 draw=ImageDraw.Draw(impreview)
