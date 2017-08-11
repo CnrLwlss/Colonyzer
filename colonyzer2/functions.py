@@ -14,6 +14,7 @@ import scipy.optimize as op
 import itertools
 import sobol
 import json
+import shutil
 
 
 def is_number(s):
@@ -796,7 +797,7 @@ def saveColonyzer(filename,locs,thresh,dx,dy):
     dataf.to_csv(filename,"\t",index=False,header=False,columns=colorder)
     return(dataf)
 
-def setupDirectories(dictlist,verbose=True):
+def setupDirectories(dictlist,verbose=True,remove=False):
     '''Create output directories and return paths for writing/reading files'''
     if isinstance(dictlist,dict):
         # Flatten dictionary to list:
@@ -812,14 +813,25 @@ def setupDirectories(dictlist,verbose=True):
         imdir=os.path.join(directory,"Output_Images")
         datdir=os.path.join(directory,"Output_Data")
         repdir=os.path.join(directory,"Output_Reports")
-        try:
-            os.mkdir(imdir)
-            os.mkdir(datdir)
-            os.mkdir(repdir)
-            if verbose: print("Created "+imdir+" & "+datdir+" & "+repdir+".")
-            newdirs.append(directory)
-        except:
-            continue
+        if remove:
+            try:
+                if verbose:
+                    if os.path.exists(imdir) or os.path.exists(datdir) or os.path.exists(repdir):
+                        print("Removing "+imdir+" & "+datdir+" & "+repdir+".")
+                shutil.rmtree(imdir)
+                shutil.rmtree(datdir)
+                shutil.rmtree(repdir)
+            except:
+                continue
+        else:
+            try:
+                os.mkdir(imdir)
+                os.mkdir(datdir)
+                os.mkdir(repdir)
+                if verbose: print("Created "+imdir+" & "+datdir+" & "+repdir+".")
+                newdirs.append(directory)
+            except:
+                continue
     return(newdirs)
 
 def getImageNames(fullpath):

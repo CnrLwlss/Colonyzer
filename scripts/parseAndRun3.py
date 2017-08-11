@@ -14,19 +14,20 @@ from PIL import Image,ImageDraw
 from scipy import ndimage
 from pkg_resources import resource_filename, Requirement
 
-def checkImages(fdir,fdict=None,barcRange=(0,-24),verbose=False):
+def checkImages(fdir,fdict=None,barcRange=(0,-24),verbose=False,checkDone=True):
     '''Discover barcodes in current working directory (or in fdir or in those specified in fdict) for which analysis has not started.'''
     if fdict!=None:
         with open(fdict, 'rb') as fp:
             barcdict = json.load(fp)
-            # Drop any barcodes that are currently being analysed/already analysed
-            barcdict={x:barcdict[x] for x in barcdict.keys() if not c2.checkAnalysisStarted(barcdict[x][-1])}
+            if checkDone:
+                # Drop any barcodes that are currently being analysed/already analysed
+                barcdict={x:barcdict[x] for x in barcdict.keys() if not c2.checkAnalysisStarted(barcdict[x][-1])}
     else:
         # Find image files which have yet to be analysed
         # Lydall lab file naming convention (barcRange)
         # First 15 characters in filename identify unique plates
         # Remaining charaters can be used to store date, time etc.
-        barcdict=c2.getBarcodes(fdir,barcRange,verbose=verbose)
+        barcdict=c2.getBarcodes(fdir,barcRange,verbose=verbose,checkDone=checkDone)
     return(barcdict)
 
 def parseArgs(inp=''):
@@ -39,16 +40,17 @@ def parseArgs(inp=''):
     parser.add_argument("-i","--initpos", help="Use intial guess for culture positions from Colonyzer.txt file?", action="store_true")
     parser.add_argument("-x","--cut", help="Cut culture signal from first image to make pseudo-empty plate?", action="store_true")
     parser.add_argument("-q","--quiet", help="Suppress messages printed to screen during analysis?", action="store_true")
+    parser.add_argument("-r","--remove", help="Remove Colonyzer output files from directory before analysis", action="store_true")
     parser.add_argument("-e","--endpoint", help="Only analyse final image in series.  Mostly for testing single image analysis.",action="store_true")
     parser.add_argument("-k","--edgemask", help="Use intensity gradient & morphology for image segmentation instead of thresholding.",action="store_true")
-    parser.add_argument("-s","--slopefill", type=float, help="Magnitude of slope defining edge of colony area (affects construction of pseudo-empty plate during lighting correction as well as Trimmed & Area measures)", default=0.9)
+    parser.add_argument("-s","--slopefill", type=float, help="Magnitude of slope defining edge of colony area. Affects construction of pseudo-empty plate during lighting correction as well as Trimmed & Area measures.  Default = 0.9", default=0.9)
     parser.add_argument("-g","--greenlab", help="Check for presence of GreenLab lids on plates.",action="store_true")
     parser.add_argument("-d","--dir", type=str, help="Directory in which to search for image files that have not been analysed (current directory by default).",default=".")
     parser.add_argument("-l","--logsdir", type=str, help="Directory in which to search for JSON files listing images for analyis (e.g. LOGS3, root of HTS filestore).  Only used when intending to specify images for analysis in .json file (see -u).",default=".")
     parser.add_argument("-f","--fixthresh", type=float, help="Image segmentation threshold value (default is automatic thresholding).")
     parser.add_argument("-u","--usedict", type=str, help="Load .json file specifying images to analyse.  If argument has a .json extension, treat as filename.  Otherwise assume argument is a HTS-style screen ID and return path to appropriate .json file from directory structure.  See C2Find.py in HTSauto package.")
     parser.add_argument("-o","--fmt", type=str, nargs='+', help="Specify rectangular grid format, either using integer shorthand (e.g. -o 96, -o 384, -o 768 -o 1536) or explicitly specify number of rows followed by number of columns (e.g.: -o 24 16 or -o 24x16).", default=['384'])
-    parser.add_argument("-t","--updates", type=int, help="Number of (quasi-)randomly distributed grid positions to assess in first phase of grid location.  Ignored when -initpos specified.", default=144)
+    parser.add_argument("-t","--updates", type=int, help="Number of (quasi-)randomly distributed grid positions to assess in first phase of grid location.  Ignored when -initpos specified.  Default = 144", default=144)
     
     
     if inp=="":
@@ -140,7 +142,7 @@ def buildVars(inp=''):
     res={'lc':inp.lc,'fixedThresh':fixedThresh,'plots':inp.plots,'initpos':inp.initpos,
          'fdict':fdict,'fdir':fdir,'nrow':nrow,'ncol':ncol,'cut':cut,'verbose':verbose,
          'diffims':diffIms,'updates':inp.updates,'endpoint':inp.endpoint,'edgemask':inp.edgemask,
-         'greenlab':inp.greenlab,'slopefill':inp.slopefill}
+         'greenlab':inp.greenlab,'slopefill':inp.slopefill,'remove':inp.remove}
     return(res)
 
 def locateJSON(scrID,dirHTS='.',verbose=False):
@@ -194,6 +196,10 @@ def main(inp=""):
 
     var=buildVars(inp=inp)
     correction,fixedThresh,plots,initpos,fdict,fdir,nrow,ncol,cut,verbose,diffIms,updates,endpoint,edgemask,greenlab=(var["lc"],var["fixedThresh"],var["plots"],var["initpos"],var["fdict"],var["fdir"],var["nrow"],var["ncol"],var["cut"],var["verbose"],var["diffims"],var["updates"],var["endpoint"],var["edgemask"],var["greenlab"])
+    if(var['remove']):
+        barcdict=checkImages(fdir,fdict,verbose=verbose,checkDone=False)
+        rept=c2.setupDirectories(barcdict,verbose=verbose,remove=True)
+        
     barcdict=checkImages(fdir,fdict,verbose=verbose)
     rept=c2.setupDirectories(barcdict,verbose=verbose)
 
@@ -301,21 +307,20 @@ def main(inp=""):
                 dataf=c2.saveColonyzer(os.path.join(os.path.dirname(FILENAME),"Output_Data",os.path.basename(FILENAME).split(".")[0]+".dat"),locations,thresh,dx,dy)
 
                 # Visual check of culture locations
-                useMask=False
-                linewidth=max(1,int(round(min(im.size)/500.0)))
-                if useMask:
-                    impreview=c2.threshPreview(locations,mask,None,linethick=linewidth,circlerad=linewidth)
-                else:
-                    arr_stretch=255*arr/np.max(arr)
-                    impreview=c2.threshPreview(locations,arr_stretch,None,linethick=linewidth,circlerad=linewidth)
 
-                r=5
+                linewidth=max(1,int(round(min(im.size)/500.0)))
+                impreview_mask=c2.threshPreview(locations,mask,None,linethick=linewidth,circlerad=linewidth)
+                arr_stretch=255*arr/np.max(arr)
+                impreview=c2.threshPreview(locations,arr_stretch,None,linethick=linewidth,circlerad=linewidth)
+
+                r=max(1,int(round(linewidth/2.0)))
                 draw=ImageDraw.Draw(impreview)
                 draw.ellipse((com[1]-r,com[0]-r,com[1]+r,com[0]+r),fill=(255,0,0))
                 draw.ellipse((corner[1]-r,corner[0]-r,corner[1]+r,corner[0]+r),fill=(255,0,0))
                 draw.ellipse((guess[1]-r,guess[0]-r,guess[1]+r,guess[0]+r),fill=(255,0,0))
                 draw.ellipse((candx[0]-r,candy[0]-r,candx[0]+r,candy[0]+r),fill=(255,0,0))
                 impreview.save(os.path.join(os.path.dirname(FILENAME),"Output_Images",os.path.basename(FILENAME).split(".")[0]+".png"))
+                impreview_mask.save(os.path.join(os.path.dirname(FILENAME),"Output_Images",os.path.basename(FILENAME).split(".")[0]+"_AREA.png"))
 
                 # Get ready for next image
                 if verbose: print("Finished {0} in {1:.2f}s".format(os.path.basename(FILENAME),time.time()-startim))
