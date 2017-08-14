@@ -912,11 +912,8 @@ def merge_lodols(dolList):
 
 def openImage(imName):
     '''Open an image, strip alpha channel, convert to array of floats.'''
-    im=Image.open(imName)
-    # Strip alpha channel if present
-    im = im.convert("RGB")
-    img=im.convert("F")
-    arrN=np.array(img,dtype=np.float)
+    im=Image.open(imName).convert("RGB")
+    arrN=np.array(im.convert("F"),dtype=np.float)
     return(im,arrN)
 
 def locateCulturesScan(candx,candy,dx,dy,arrN,nx,ny,search=0.4,radFrac=1.0,mkPlots=False,update=True):
@@ -1043,11 +1040,10 @@ def makeCorrectionMap(arr0,locations,smoothfactor=250,verbose=True):
     if verbose: print("Lighting correction map constructed.")
     return(correction_map,average_back)
 
-def measureSizeAndColour(locations,arr,im,finalmask,average_back,barcode,filename):
+def measureSizeAndColour(locations,arr,im,mask,average_back,barcode,filename):
     '''Generate culture size and colour estimates given pixel array, culture locations and an image mask.'''
-    edge=getEdges(arr,0.925)
-    locations=sizeSpots(locations,arr,finalmask,edge,average_back)
-    locations=getColours(im,locations,finalmask)
+    locations=sizeSpots(locations,arr,mask,getEdges(arr,0.925),average_back)
+    locations=getColours(im,locations,mask)
     locations["Barcode"]=barcode
     locations["Filename"]=os.path.basename(filename).split(".")[0]
     return(locations)

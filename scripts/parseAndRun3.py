@@ -36,13 +36,13 @@ def parseArgs(inp=''):
 
     parser.add_argument("-c","--lc", help="Enable lighting correction?", action="store_true")
     parser.add_argument("-m","--diffims", help="If lighting correction switched on, attempt to correct for lighting differences between images in timecourse (can induce slight negative cell density estimates).", action="store_true")
-    parser.add_argument("-p","--plots", help="Plot pixel intensity distributions, segmentation thresholds and spot location traces?", action="store_true")
+    parser.add_argument("-p","--plots", help="Plot spot location traces?", action="store_true")
     parser.add_argument("-i","--initpos", help="Use intial guess for culture positions from Colonyzer.txt file?", action="store_true")
     parser.add_argument("-x","--cut", help="Cut culture signal from first image to make pseudo-empty plate?", action="store_true")
     parser.add_argument("-q","--quiet", help="Suppress messages printed to screen during analysis?", action="store_true")
-    parser.add_argument("-r","--remove", help="Remove Colonyzer output files from directory before analysis", action="store_true")
+    parser.add_argument("-r","--remove", help="Remove Colonyzer output files from directory before analysis?", action="store_true")
     parser.add_argument("-e","--endpoint", help="Only analyse final image in series.  Mostly for testing single image analysis.",action="store_true")
-    parser.add_argument("-k","--edgemask", help="Use intensity gradient & morphology for image segmentation instead of thresholding.",action="store_true")
+    parser.add_argument("-k","--edgemask", help="During lighting correction, use intensity gradient & morphology for final image segmentation instead of thresholding.",action="store_true")
     parser.add_argument("-s","--slopefill", type=float, help="Magnitude of slope defining edge of colony area. Affects construction of pseudo-empty plate during lighting correction as well as Trimmed & Area measures.  Default = 0.9", default=0.9)
     parser.add_argument("-g","--greenlab", help="Check for presence of GreenLab lids on plates.",action="store_true")
     parser.add_argument("-d","--dir", type=str, help="Directory in which to search for image files that have not been analysed (current directory by default).",default=".")
@@ -51,7 +51,6 @@ def parseArgs(inp=''):
     parser.add_argument("-u","--usedict", type=str, help="Load .json file specifying images to analyse.  If argument has a .json extension, treat as filename.  Otherwise assume argument is a HTS-style screen ID and return path to appropriate .json file from directory structure.  See C2Find.py in HTSauto package.")
     parser.add_argument("-o","--fmt", type=str, nargs='+', help="Specify rectangular grid format, either using integer shorthand (e.g. -o 96, -o 384, -o 768 -o 1536) or explicitly specify number of rows followed by number of columns (e.g.: -o 24 16 or -o 24x16).", default=['384'])
     parser.add_argument("-t","--updates", type=int, help="Number of (quasi-)randomly distributed grid positions to assess in first phase of grid location.  Ignored when -initpos specified.  Default = 144", default=144)
-    
     
     if inp=="":
         args = parser.parse_args()
@@ -195,6 +194,7 @@ def main(inp=""):
     print("Colonyzer "+c2.__version__)
 
     var=buildVars(inp=inp)
+
     correction,fixedThresh,plots,initpos,fdict,fdir,nrow,ncol,cut,verbose,diffIms,updates,endpoint,edgemask,greenlab=(var["lc"],var["fixedThresh"],var["plots"],var["initpos"],var["fdict"],var["fdir"],var["nrow"],var["ncol"],var["cut"],var["verbose"],var["diffims"],var["updates"],var["endpoint"],var["edgemask"],var["greenlab"])
     if(var['remove']):
         barcdict=checkImages(fdir,fdict,verbose=verbose,checkDone=False)
@@ -255,10 +255,12 @@ def main(inp=""):
                 ny=nrow=len(np.unique(candy)) 
                 nx=ncol=len(np.unique(candx))
             else:
+                if verbose: print("Initial estimate for location of spots on plate...")
                 # Automatically generate guesses for gridded array locations
                 (candx,candy,dx,dy,corner,com,guess)=c2.estimateLocations(arrloc,ncol,nrow,showPlt=plots,pdf=pdf,glob=False,verbose=verbose,nsol=updates)
 
             # Update guesses and initialise locations data frame
+            if verbose: print("Updating estimate for location of spots on plate...")
             locationsN=c2.locateCultures([int(round(cx-dx/2.0)) for cx in candx],[int(round(cy-dy/2.0)) for cy in candy],dx,dy,arrloc,ncol,nrow,update=True)
 
             mask=edgeFill2(arrN,var['slopefill'])
@@ -269,18 +271,29 @@ def main(inp=""):
             agar=np.logical_and(grd,~mask)
             ave0=np.mean(arr0[agar])
             thresh=-99
+
+            mask=None
             
             if correction:
                 if cut:
+                    if verbose: print("Constructing pseudoempty plate...")
                     pseudoempty = np.array(np.round(arr0.copy()),dtype=np.uint8)
                     bytemask = np.asarray(spots*255, dtype=np.uint8)
                     filled = cv2.inpaint(pseudoempty,bytemask,10,cv2.INPAINT_TELEA)
                     blurred = cv2.GaussianBlur(filled,(21,21),0)
                     pseudoempty[spots] = blurred[spots]
+                    filled=None
+                    blurred=None
                 else:
                     pseudoempty=arr0
             else:
                 pseudoempty=0
+
+            # Segment final image
+            #thresh,bindat=c2.automaticThreshold(arrN-pseudoempty)
+            thresh, tmask = cv2.threshold(np.array(np.round(np.maximum((arrN-pseudoempty)[grd],0)),dtype=np.uint8),0,255,cv2.THRESH_BINARY_INV+cv2.THRESH_OTSU)
+            thresh = thresh - 15
+            tmask=None
 
             for FILENAME in barcdict[BARCODE]:
 
@@ -296,11 +309,13 @@ def main(inp=""):
                 # Subtract background (corrects for lighting differences within plate/image as well as making agar intensity correspond to zero signal)
                 arr=np.maximum(arr-pseudoempty,0)
 
-                mask=edgeFill2(arr,var['slopefill'])
-                spots_timepoint=np.logical_and(grd,mask)                
+                #mask=edgeFill2(arr,var['slopefill'])
+                
+                mask=np.ones(arr.shape,dtype=np.bool)
+                mask[arr<thresh]=False
                 
                 # Measure culture phenotypes
-                locations=c2.measureSizeAndColour(locationsN,arr,im,spots,0,BARCODE,FILENAME[0:-4])
+                locations=c2.measureSizeAndColour(locationsN,arr,im,np.logical_and(grd,mask),0,BARCODE,FILENAME[0:-4])
 
                 # Write results to file
                 locations.to_csv(os.path.join(os.path.dirname(FILENAME),"Output_Data",os.path.basename(FILENAME).split(".")[0]+".out"),"\t",index=False)
@@ -310,8 +325,7 @@ def main(inp=""):
 
                 linewidth=max(1,int(round(min(im.size)/500.0)))
                 impreview_mask=c2.threshPreview(locations,mask,None,linethick=linewidth,circlerad=linewidth)
-                arr_stretch=255*arr/np.max(arr)
-                impreview=c2.threshPreview(locations,arr_stretch,None,linethick=linewidth,circlerad=linewidth)
+                impreview=c2.threshPreview(locations,255*arr/np.max(arr),None,linethick=linewidth,circlerad=linewidth)
 
                 r=max(1,int(round(linewidth/2.0)))
                 draw=ImageDraw.Draw(impreview)
@@ -324,6 +338,8 @@ def main(inp=""):
 
                 # Get ready for next image
                 if verbose: print("Finished {0} in {1:.2f}s".format(os.path.basename(FILENAME),time.time()-startim))
+                im=None
+                arr=None
 
         # Get ready for next image
         if verbose: print("Finished {0} in {1:.2f}s".format(os.path.basename(BARCODE),time.time()-start))
