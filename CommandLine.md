@@ -1,9 +1,9 @@
 ```
->colonyzer -h
-Colonyzer 1.0.93.4f756d5b5b72d7fa6f81b585229406751363d9cb
-usage: colonyzer-script.py [-h] [-c] [-m] [-p] [-i] [-x] [-q] [-e] [-d DIR]
-                           [-l LOGSDIR] [-f FIXTHRESH] [-u USEDICT]
-                           [-o FMT [FMT ...]] [-t UPDATES]
+>>colonyzer -h
+Colonyzer 1.1.22.Unknown
+usage: colonyzer [-h] [-c] [-m] [-p] [-i] [-x] [-q] [-r] [-e] [-k]
+                 [-s SLOPEFILL] [-g] [-d DIR] [-l LOGSDIR] [-f FIXTHRESH]
+                 [-u USEDICT] [-o FMT [FMT ...]] [-t UPDATES]
 
 Analyse timeseries of QFA images: locate cultures on plate, segment image into
 agar and cells, apply lighting correction, write report including cell density
@@ -18,15 +18,25 @@ optional arguments:
   -m, --diffims         If lighting correction switched on, attempt to correct
                         for lighting differences between images in timecourse
                         (can induce slight negative cell density estimates).
-  -p, --plots           Plot pixel intensity distributions, segmentation
-                        thresholds and spot location traces?
+  -p, --plots           Plot spot location traces?
   -i, --initpos         Use intial guess for culture positions from
                         Colonyzer.txt file?
   -x, --cut             Cut culture signal from first image to make pseudo-
                         empty plate?
   -q, --quiet           Suppress messages printed to screen during analysis?
+  -r, --remove          Remove Colonyzer output files from directory before
+                        analysis?
   -e, --endpoint        Only analyse final image in series. Mostly for testing
                         single image analysis.
+  -k, --edgemask        During lighting correction, use intensity gradient &
+                        morphology for final image segmentation instead of
+                        thresholding.
+  -s SLOPEFILL, --slopefill SLOPEFILL
+                        Magnitude of slope defining edge of colony area.
+                        Affects construction of pseudo-empty plate during
+                        lighting correction as well as Trimmed & Area
+                        measures. Default = 0.9
+  -g, --greenlab        Check for presence of GreenLab lids on plates.
   -d DIR, --dir DIR     Directory in which to search for image files that have
                         not been analysed (current directory by default).
   -l LOGSDIR, --logsdir LOGSDIR
@@ -51,5 +61,5 @@ optional arguments:
   -t UPDATES, --updates UPDATES
                         Number of (quasi-)randomly distributed grid positions
                         to assess in first phase of grid location. Ignored
-                        when -initpos specified.
+                        when -initpos specified. Default = 144
 ```
